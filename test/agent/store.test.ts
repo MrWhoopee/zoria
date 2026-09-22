@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { emptyState, loadState, saveState } from '../../src/agent/store.ts';
@@ -68,6 +68,17 @@ test('non-object JSON body returns empty state, not exception', async () => {
 test('a read failure other than a missing file is not silently treated as never attempted', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'zoria-'));
   await assert.rejects(() => loadState(dir));
+});
+
+test('the state file is created with mode 0o600', async (t) => {
+  if (process.platform === 'win32') {
+    t.skip('Windows emulates POSIX mode bits; the agent runs on Linux');
+    return;
+  }
+  const path = await tmpFile();
+  await saveState(path, emptyState());
+  const info = await stat(path);
+  assert.equal(info.mode & 0o777, 0o600);
 });
 
 test('concurrent saves complete without corruption', async () => {

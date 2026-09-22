@@ -335,6 +335,38 @@ test('a jammed address during an open window sends nothing until the jam clears'
   } finally { server.close(); }
 });
 
+test('setApplication after registration does not re-derive phase and risk a second attempt', async () => {
+  const { url, server, hits } = await api({
+    '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })],
+  });
+  try {
+    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    await r.setApplication(APP);
+    await r.onEther(windowOpen());
+    assert.equal(r.phase(), 'registered');
+
+    await r.setApplication({ ...APP, invitation: '' });
+    assert.equal(r.phase(), 'registered', 'a late application update must not undo a completed registration');
+
+    await r.onEther(windowOpen());
+    assert.deepEqual(hits, ['/auth/register'], 'no second registration attempt is fired');
+  } finally { server.close(); }
+});
+
+test('setApplication while lost does not re-derive phase and risk a second attempt', async () => {
+  const { url, server, hits } = await api({ '/auth/register': [() => 'hang'], '/auth/login': [() => 'hang'] });
+  try {
+    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    await r.setApplication(APP);
+    await r.onEther(windowOpen());
+    assert.equal(r.phase(), 'lost');
+
+    await r.setApplication({ ...APP, displayName: 'Changed Name' });
+    assert.equal(r.phase(), 'lost', 'a late application update must not escape lost and risk a second registration');
+    assert.deepEqual(hits, ['/auth/register', '/auth/login']);
+  } finally { server.close(); }
+});
+
 test('after success there are no repeat registration requests', async () => {
   const { url, server, hits } = await api({
     '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })],
