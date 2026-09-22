@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 
@@ -60,9 +60,15 @@ export async function saveState(path: string, state: AgentState): Promise<void> 
   const body = `${JSON.stringify(state, null, 2)}\n`;
   const previous = writeQueues.get(path) ?? Promise.resolve();
   const next = previous.then(async () => {
-    await mkdir(dirname(path), { recursive: true });
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
     const tmp = `${path}.${randomUUID()}.tmp`;
-    await writeFile(tmp, body, { encoding: 'utf8', mode: 0o600 });
+    const handle = await open(tmp, 'w', 0o600);
+    try {
+      await handle.writeFile(body, { encoding: 'utf8' });
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
     await rename(tmp, path);
   });
   writeQueues.set(path, next.catch(() => {}));
