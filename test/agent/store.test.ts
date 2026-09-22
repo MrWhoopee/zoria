@@ -65,6 +65,11 @@ test('non-object JSON body returns empty state, not exception', async () => {
   assert.deepEqual(await loadState(path), emptyState());
 });
 
+test('a read failure other than a missing file is not silently treated as never attempted', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'zoria-'));
+  await assert.rejects(() => loadState(dir));
+});
+
 test('concurrent saves complete without corruption', async () => {
   const path = await tmpFile();
   const state1 = emptyState();

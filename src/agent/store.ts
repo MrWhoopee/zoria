@@ -35,13 +35,21 @@ export function emptyState(): AgentState {
 }
 
 export async function loadState(path: string): Promise<AgentState> {
+  let raw: string;
   try {
-    const parsed = JSON.parse(await readFile(path, 'utf8')) as Partial<AgentState>;
+    raw = await readFile(path, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return emptyState();
+    throw err;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AgentState> | null;
     const base = emptyState();
     return {
-      application: parsed.application ?? base.application,
-      registration: { ...base.registration, ...parsed.registration },
-      ether: { ...base.ether, ...parsed.ether },
+      application: parsed?.application ?? base.application,
+      registration: { ...base.registration, ...parsed?.registration },
+      ether: { ...base.ether, ...parsed?.ether },
     };
   } catch {
     return emptyState();
