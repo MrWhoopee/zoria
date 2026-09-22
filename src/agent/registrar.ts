@@ -133,7 +133,12 @@ export class Registrar {
       if ('failed' in res) { this.#phase = 'lost'; await this.#login(); return; }
 
       const session = asSession(res.body);
-      if (res.status === 201 && session) { await this.#accept(session); return; }
+      if (res.status >= 200 && res.status < 300) {
+        if (session) { await this.#accept(session); return; }
+        this.#phase = 'lost';
+        await this.#login();
+        return;
+      }
 
       const code = errorCode(res.body);
 

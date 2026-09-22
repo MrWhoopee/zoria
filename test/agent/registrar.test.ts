@@ -257,6 +257,33 @@ test('login 401 clears the attempt marker so a dropped registration is not stuck
   } finally { server.close(); }
 });
 
+test('a 201 with a truncated body logs in instead of blocking a probably-created account', async () => {
+  const { url, server, hits } = await api({
+    '/auth/register': [() => ({ status: 201, body: '{"token":"' })],
+    '/auth/login': [() => ({ status: 200, body: JSON.stringify(SESSION) })],
+  });
+  try {
+    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    await r.setApplication(APP);
+    await r.onEther(windowOpen());
+    assert.deepEqual(hits, ['/auth/register', '/auth/login']);
+    assert.equal(r.phase(), 'registered');
+  } finally { server.close(); }
+});
+
+test('a 200 instead of 201 with a valid session is accepted, not blocked', async () => {
+  const { url, server, hits } = await api({
+    '/auth/register': [() => ({ status: 200, body: JSON.stringify(SESSION) })],
+  });
+  try {
+    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    await r.setApplication(APP);
+    await r.onEther(windowOpen());
+    assert.deepEqual(hits, ['/auth/register']);
+    assert.equal(r.phase(), 'registered');
+  } finally { server.close(); }
+});
+
 test('422 invalid-invitation halts the machine and calls for a human', async () => {
   const { url, server } = await api({
     '/auth/register': [() => ({ status: 422, body: JSON.stringify({ error: { code: 'invalid-invitation', field: 'invitation' } }) })],
