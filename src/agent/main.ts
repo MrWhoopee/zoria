@@ -19,6 +19,8 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
+const monotonicNow = (): number => Math.round(performance.timeOrigin + performance.now());
+
 const config = loadConfig();
 
 if (!config.fingerprint) {
@@ -37,7 +39,7 @@ const MAX_KEY_FETCH_ATTEMPTS = 20;
 
 async function fetchStationKey(): Promise<RawResponse> {
   for (let attempt = 0; attempt < MAX_KEY_FETCH_ATTEMPTS; attempt += 1) {
-    const res = await fetchRaw(`${config.api}/ether/key`, {}, config.requestTimeoutMs);
+    const res = await fetchRaw(`${config.api}/ether/key`, {}, config.requestTimeoutMs, monotonicNow);
     if (!('failed' in res)) return res;
     console.error(
       `could not fetch the station key (attempt ${attempt + 1}/${MAX_KEY_FETCH_ATTEMPTS}): ${res.failed}`,
@@ -76,7 +78,9 @@ try {
 console.log('station key accepted, fingerprint verified');
 
 const state = await loadState(config.statePath);
-const registrar = new Registrar({ api: config.api, statePath: config.statePath, state });
+const registrar = new Registrar({
+  api: config.api, statePath: config.statePath, state, now: monotonicNow,
+});
 
 const loop = new EtherLoop({
   api: config.api,
@@ -85,11 +89,12 @@ const loop = new EtherLoop({
   intervalMs: config.etherIntervalMs,
   capacity: 20,
   refillMs: 3000,
+  now: monotonicNow,
 });
 
 loop.on((ether, obs) => {
   const mark = obs.t === 'signal' ? `signal ${obs.frame.phase}` : obs.t;
-  console.log(`[${new Date().toISOString()}] ${mark} | phase=${ether.phase} | ${registrar.phase()}`);
+  console.log(`[${new Date(monotonicNow()).toISOString()}] ${mark} | phase=${ether.phase} | ${registrar.phase()}`);
   registrar.onEther(ether).catch((err: unknown) => {
     console.error(`registrar failed: ${err instanceof Error ? err.message : String(err)}`);
   });
@@ -105,8 +110,8 @@ const api = await startLocalApi({
     ether: loop.state(),
     registrar: registrar.phase(),
     blockedReason: registrar.blockedReason(),
-    serverNow: loop.state().lastFrameAt === null ? null : serverNow(loop.state(), Date.now()),
-    msUntilOpen: msUntilOpen(loop.state(), Date.now()),
+    serverNow: loop.state().lastFrameAt === null ? null : serverNow(loop.state(), monotonicNow()),
+    msUntilOpen: msUntilOpen(loop.state(), monotonicNow()),
   }),
   onApplication: (a) => registrar.setApplication(a),
   onInvitation: (c) => registrar.setInvitation(c),
