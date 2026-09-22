@@ -106,11 +106,12 @@ export class Registrar {
   }
 
   async #persist(patch: Partial<AgentState['registration']>): Promise<void> {
-    this.#state = {
+    const next: AgentState = {
       ...this.#state,
       registration: { ...this.#state.registration, ...patch },
     };
-    await saveState(this.#opts.statePath, this.#state);
+    await saveState(this.#opts.statePath, next);
+    this.#state = next;
   }
 
   async #register(): Promise<void> {
