@@ -71,6 +71,36 @@ test('timeout does not hang agent', async () => {
   }
 });
 
+test('non-numeric Retry-After returns null', async () => {
+  const { url, server } = await listen((_req, res) => {
+    res.writeHead(429, { 'retry-after': 'soon' });
+    res.end('');
+  });
+  try {
+    const r = await fetchRaw(`${url}/ether`, {}, 5000, () => 11);
+    assert.ok(!('failed' in r));
+    if ('failed' in r) return;
+    assert.equal(r.retryAfterSeconds, null);
+  } finally {
+    server.close();
+  }
+});
+
+test('negative Retry-After returns null', async () => {
+  const { url, server } = await listen((_req, res) => {
+    res.writeHead(429, { 'retry-after': '-5' });
+    res.end('');
+  });
+  try {
+    const r = await fetchRaw(`${url}/ether`, {}, 5000, () => 12);
+    assert.ok(!('failed' in r));
+    if ('failed' in r) return;
+    assert.equal(r.retryAfterSeconds, null);
+  } finally {
+    server.close();
+  }
+});
+
 test('config strips trailing slash and reads stand from env', () => {
   const c = loadConfig({ ZORIA_API: 'https://stand.zoria.net/api/v1/' } as NodeJS.ProcessEnv);
   assert.equal(c.api, 'https://stand.zoria.net/api/v1');
