@@ -17,6 +17,7 @@ export type EtherLoopOptions = {
 };
 
 type Listener = (s: EtherState, o: Observation) => void;
+type ErrorListener = (err: unknown) => void;
 
 export class EtherLoop {
   readonly #opts: Required<EtherLoopOptions>;
@@ -26,6 +27,7 @@ export class EtherLoop {
   #blockedUntil = 0;
   #timer: NodeJS.Timeout | null = null;
   #listeners: Listener[] = [];
+  #errorListeners: ErrorListener[] = [];
 
   constructor(opts: EtherLoopOptions) {
     this.#opts = { now: Date.now, rand: Math.random, ...opts };
@@ -35,6 +37,7 @@ export class EtherLoop {
   state(): EtherState { return this.#state; }
   failures(): number { return this.#failures; }
   on(fn: Listener): void { this.#listeners.push(fn); }
+  onError(fn: ErrorListener): void { this.#errorListeners.push(fn); }
 
   #emit(o: Observation): void {
     this.#state = reduceEther(this.#state, o);
@@ -67,7 +70,11 @@ export class EtherLoop {
 
   start(): void {
     if (this.#timer) return;
-    const tick = (): void => { void this.tickOnce(); };
+    const tick = (): void => {
+      this.tickOnce().catch((err: unknown) => {
+        for (const fn of this.#errorListeners) fn(err);
+      });
+    };
     this.#timer = setInterval(tick, this.#opts.intervalMs);
     tick();
   }

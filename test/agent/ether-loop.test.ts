@@ -47,6 +47,7 @@ test('jamming stops requests for the whole Retry-After', async () => {
     const loop = await loopOn(noise.url, () => clock);
     await loop.tickOnce();
     assert.equal(noise.requestCount(), 1);
+    assert.equal(loop.failures(), 0, 'jamming is not counted as a failure');
 
     clock = 29_000;
     await loop.tickOnce();
@@ -66,7 +67,17 @@ test('503 stopping is a pause, not a failure: the backoff counter does not grow'
     let clock = 0;
     const loop = await loopOn(noise.url, () => clock);
     await loop.tickOnce();
+    assert.equal(noise.requestCount(), 1);
     assert.equal(loop.failures(), 0, 'the node falling silent is not counted as a failure');
+
+    clock = 999;
+    await loop.tickOnce();
+    assert.equal(noise.requestCount(), 1, 'no requests while the node is stopping');
+
+    clock = 1001;
+    await loop.tickOnce();
+    assert.equal(noise.requestCount(), 2, 'request goes out once the stated Retry-After passes');
+    assert.equal(loop.failures(), 0, 'still not counted as a failure once the pause ends');
   } finally {
     await noise.close();
   }
@@ -180,6 +191,55 @@ test('start() and stop() do not leak the interval timer', async () => {
     loop.start();
     loop.stop();
     loop.stop();
+  } finally {
+    await noise.close();
+  }
+});
+
+test('a throwing on() listener is caught, routed to onError, and the loop keeps working', async () => {
+  const noise = await startNoiseServer([{ kind: 'signal' }, { kind: 'signal' }]);
+  const loop = await loopOn(noise.url, () => 0);
+  try {
+    let calls = 0;
+    loop.on(() => {
+      calls += 1;
+      if (calls === 1) throw new Error('boom');
+    });
+
+    const caught = await new Promise<unknown>((resolve) => {
+      loop.onError(resolve);
+      loop.start();
+    });
+    assert.equal((caught as Error).message, 'boom');
+
+    await loop.tickOnce();
+    assert.equal(loop.state().phase, 'static', 'the loop keeps updating state after a listener error');
+    assert.equal(calls, 2);
+  } finally {
+    loop.stop();
+    await noise.close();
+  }
+});
+
+test('the local backoff gate blocks a second request while the pause has not elapsed', async () => {
+  const noise = await startNoiseServer([{ kind: 'hang' }]);
+  try {
+    let clock = 0;
+    const ring = new KeyRing();
+    ring.add(await makeStationKey(LEARNING_PUBLIC_KEY, LEARNING_FINGERPRINT));
+    const loop = new EtherLoop({
+      api: noise.url, ring, timeoutMs: 2000, intervalMs: 15_000,
+      capacity: 20, refillMs: 3000, now: () => clock,
+      rand: () => 1,
+    });
+
+    await loop.tickOnce();
+    assert.equal(noise.requestCount(), 1);
+    assert.equal(loop.failures(), 1);
+
+    clock = 500;
+    await loop.tickOnce();
+    assert.equal(noise.requestCount(), 1, 'still inside the backoff pause, no second request');
   } finally {
     await noise.close();
   }
