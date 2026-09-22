@@ -84,7 +84,7 @@ export class Registrar {
   }
 
   async onEther(ether: EtherState): Promise<void> {
-    if (ether.phase === 'window') this.#lastWindowOpen = ether;
+    this.#lastWindowOpen = ether.phase === 'window' ? ether : null;
     if (this.#busy) return;
     if (this.#phase === 'registered' || this.#phase === 'blocked') return;
 

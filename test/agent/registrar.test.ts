@@ -97,6 +97,21 @@ test('a code added mid-flight immediately triggers registration during an open w
   } finally { server.close(); }
 });
 
+test('a code arriving after the window has closed does not fire a doomed registration', async () => {
+  const { url, server, hits } = await api({});
+  try {
+    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    await r.setApplication({ ...APP, invitation: '' });
+    await r.onEther(windowOpen());
+    await r.onEther({ ...initialEther(), phase: 'after' });
+    assert.equal(r.phase(), 'no-invitation');
+
+    await r.setInvitation('CODE-123');
+    assert.equal(hits.length, 0, 'no request once the window has closed for good');
+    assert.equal(r.phase(), 'listening', 'a late code must not be mistaken for an invalid one');
+  } finally { server.close(); }
+});
+
 test('during the noise phase the application is not sent', async () => {
   const { url, server, hits } = await api({});
   try {
