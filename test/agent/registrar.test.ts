@@ -286,6 +286,28 @@ test('blocked is terminal: a rejected invitation does not keep burning the rate 
   } finally { server.close(); }
 });
 
+test('a jammed address during an open window sends nothing until the jam clears', async () => {
+  const { url, server, hits } = await api({
+    '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })],
+  });
+  try {
+    let clock = 0;
+    const r = new Registrar({
+      api: url, statePath: await statePath(), state: emptyState(), now: () => clock,
+    });
+    await r.setApplication(APP);
+
+    await r.onEther({ ...windowOpen(), silentUntil: 30_000 });
+    assert.equal(hits.length, 0, 'no request while jammed, even during an open window');
+    assert.equal(r.phase(), 'listening');
+
+    clock = 30_001;
+    await r.onEther({ ...windowOpen(), silentUntil: 30_000 });
+    assert.deepEqual(hits, ['/auth/register'], 'request goes out once the jam deadline passes');
+    assert.equal(r.phase(), 'registered');
+  } finally { server.close(); }
+});
+
 test('after success there are no repeat registration requests', async () => {
   const { url, server, hits } = await api({
     '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })],

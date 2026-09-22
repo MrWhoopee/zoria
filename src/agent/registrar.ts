@@ -12,6 +12,7 @@ export type RegistrarOptions = {
   state: AgentState;
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
 };
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
@@ -51,6 +52,7 @@ export class Registrar {
     this.#opts = {
       timeoutMs: 20_000,
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+      now: Date.now,
       ...opts,
     };
     this.#state = opts.state;
@@ -84,6 +86,7 @@ export class Registrar {
   }
 
   async onEther(ether: EtherState): Promise<void> {
+    if (ether.silentUntil > this.#opts.now()) return;
     this.#lastWindowOpen = ether.phase === 'window' ? ether : null;
     if (this.#busy) return;
     if (this.#phase === 'registered' || this.#phase === 'blocked') return;
