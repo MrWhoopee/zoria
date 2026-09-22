@@ -18,6 +18,7 @@ export type RawResponse = {
 
 const DEFAULT_JAM_MS = 60_000;
 const DEFAULT_STOPPING_MS = 30_000;
+const RETRY_AFTER_CEILING_MS = 1_800_000;
 
 function errorCode(body: string): string | null {
   try {
@@ -31,7 +32,9 @@ function errorCode(body: string): string | null {
 
 export async function classifyResponse(r: RawResponse, ring: KeyRing): Promise<Observation> {
   if (r.status === 429) {
-    const ms = r.retryAfterSeconds !== null ? r.retryAfterSeconds * 1000 : DEFAULT_JAM_MS;
+    const ms = r.retryAfterSeconds !== null
+      ? Math.min(r.retryAfterSeconds * 1000, RETRY_AFTER_CEILING_MS)
+      : DEFAULT_JAM_MS;
     return { t: 'jammed', retryAfterMs: ms, receivedAt: r.receivedAt };
   }
 
@@ -46,7 +49,9 @@ export async function classifyResponse(r: RawResponse, ring: KeyRing): Promise<O
   }
 
   if (r.status >= 500 && errorCode(r.body) === 'stopping') {
-    const ms = r.retryAfterSeconds !== null ? r.retryAfterSeconds * 1000 : DEFAULT_STOPPING_MS;
+    const ms = r.retryAfterSeconds !== null
+      ? Math.min(r.retryAfterSeconds * 1000, RETRY_AFTER_CEILING_MS)
+      : DEFAULT_STOPPING_MS;
     return { t: 'stopping', retryAfterMs: ms, receivedAt: r.receivedAt };
   }
 

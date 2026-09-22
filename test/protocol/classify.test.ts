@@ -102,6 +102,24 @@ test('503 stopping without Retry-After — typical default pause of 30s', async 
   assert.deepEqual(o, { t: 'stopping', retryAfterMs: 30000, receivedAt: 1000 });
 });
 
+test('429 jammed Retry-After is clamped to 30 minutes even if the header says a day', async () => {
+  const body = JSON.stringify({ error: { code: 'jammed' } });
+  const o = await classifyResponse(
+    { status: 429, retryAfterSeconds: 86400, body, receivedAt: 1000 },
+    await ring(),
+  );
+  assert.deepEqual(o, { t: 'jammed', retryAfterMs: 1_800_000, receivedAt: 1000 });
+});
+
+test('503 stopping Retry-After is clamped to 30 minutes even if the header says a day', async () => {
+  const body = JSON.stringify({ error: { code: 'stopping' } });
+  const o = await classifyResponse(
+    { status: 503, retryAfterSeconds: 86400, body, receivedAt: 1000 },
+    await ring(),
+  );
+  assert.deepEqual(o, { t: 'stopping', retryAfterMs: 1_800_000, receivedAt: 1000 });
+});
+
 test('a 429 carrying a valid envelope is still jammed', async () => {
   const o = await classifyResponse(
     { status: 429, retryAfterSeconds: 30, body: JSON.stringify(FRAME_A), receivedAt: 1000 },
