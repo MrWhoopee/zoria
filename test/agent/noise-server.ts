@@ -8,7 +8,9 @@ export type NoiseStep =
   | { kind: 'foreign'; status?: number; body?: string }
   | { kind: 'stopping'; retryAfter?: number }
   | { kind: 'jammed'; retryAfter?: number }
-  | { kind: 'hang' };
+  | { kind: 'hang' }
+  | { kind: 'partial' }
+  | { kind: 'delay'; ms?: number };
 
 export type NoiseServer = {
   url: string;
@@ -67,6 +69,33 @@ export function startNoiseServer(initial: NoiseStep[] = [{ kind: 'signal' }]): P
       case 'hang':
         req.socket.destroy();
         return;
+      case 'partial': {
+        const envelope = JSON.stringify({
+          frame: FRAME_A.frame,
+          seal: FRAME_A.seal,
+          key: LEARNING_KEY_ID,
+        });
+        res.writeHead(200, {
+          'content-type': 'application/json',
+          'content-length': String(envelope.length),
+        });
+        res.write(envelope.slice(0, Math.floor(envelope.length / 2)));
+        req.socket.destroy();
+        return;
+      }
+      case 'delay': {
+        const envelope = JSON.stringify({
+          frame: FRAME_A.frame,
+          seal: FRAME_A.seal,
+          key: LEARNING_KEY_ID,
+        });
+        const delayMs = step.ms ?? 2000;
+        const timer = setTimeout(() => {
+          json(200, envelope);
+        }, delayMs);
+        res.on('close', () => clearTimeout(timer));
+        return;
+      }
     }
   });
 
