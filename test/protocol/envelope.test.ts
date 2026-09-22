@@ -6,11 +6,12 @@ import {
   FRAME_A, FRAME_B, FRAME_C_TEXT, FRAME_D,
   LEARNING_PUBLIC_KEY, LEARNING_FINGERPRINT, LEARNING_KEY_ID,
 } from '../fixtures/frames.ts';
-import { sealFrame } from '../fixtures/sign.ts';
+import { sealFrame, GENERATED_PUBLIC_KEY, GENERATED_FINGERPRINT, GENERATED_KEY_ID } from '../fixtures/sign.ts';
 
 async function ring(): Promise<KeyRing> {
   const r = new KeyRing();
   r.add(await makeStationKey(LEARNING_PUBLIC_KEY, LEARNING_FINGERPRINT));
+  r.add(await makeStationKey(GENERATED_PUBLIC_KEY, GENERATED_FINGERPRINT));
   return r;
 }
 
@@ -69,7 +70,7 @@ test('unknown key — its own reason', async () => {
 test('unsupported protocol version — noise with a genuine seal', async () => {
   const frameText = '{"v":2,"kind":"signal","station":"zoria","at":"2026-09-24T03:00:00.000Z","phase":"static","window":null,"harbinger":null,"fragment":null,"onAir":0}';
   const seal = await sealFrame(frameText);
-  const body = JSON.stringify({ frame: frameText, seal, key: LEARNING_KEY_ID });
+  const body = JSON.stringify({ frame: frameText, seal, key: GENERATED_KEY_ID });
   const v = await verifyEnvelope(body, await ring());
   assert.deepEqual(v, { kind: 'noise', why: 'wrong-version' });
 });
@@ -83,7 +84,7 @@ test('unknown envelope fields are ignored (CL-06)', async () => {
 test('unrecognized station — noise with a genuine seal', async () => {
   const frameText = '{"v":1,"kind":"signal","station":"echo","at":"2026-09-24T03:00:00.000Z","phase":"static","window":null,"harbinger":null,"fragment":null,"onAir":0}';
   const seal = await sealFrame(frameText);
-  const body = JSON.stringify({ frame: frameText, seal, key: LEARNING_KEY_ID });
+  const body = JSON.stringify({ frame: frameText, seal, key: GENERATED_KEY_ID });
   const v = await verifyEnvelope(body, await ring());
   assert.deepEqual(v, { kind: 'noise', why: 'wrong-station' });
 });
@@ -91,7 +92,7 @@ test('unrecognized station — noise with a genuine seal', async () => {
 test('a frame that is not a JSON object — noise with a genuine seal', async () => {
   const frameText = 'not json at all';
   const seal = await sealFrame(frameText);
-  const body = JSON.stringify({ frame: frameText, seal, key: LEARNING_KEY_ID });
+  const body = JSON.stringify({ frame: frameText, seal, key: GENERATED_KEY_ID });
   const v = await verifyEnvelope(body, await ring());
   assert.deepEqual(v, { kind: 'noise', why: 'bad-frame' });
 });
