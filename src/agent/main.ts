@@ -41,7 +41,13 @@ if (publicKey === null) {
   process.exit(1);
 }
 
-ring.add(await makeStationKey(publicKey, config.fingerprint));
+try {
+  ring.add(await makeStationKey(publicKey, config.fingerprint));
+} catch (err) {
+  console.error(err instanceof Error ? err.message : String(err));
+  console.error('station key rejected: check ZORIA_KEY_FINGERPRINT against the task text, section 3');
+  process.exit(1);
+}
 console.log('station key accepted, fingerprint verified');
 
 const state = await loadState(config.statePath);

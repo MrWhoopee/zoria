@@ -75,6 +75,22 @@ test('a malformed body does not bring the agent down', async () => {
   } finally { await api.close(); }
 });
 
+test('an empty invitation is rejected and never reaches the agent', async () => {
+  let code: string | null = null;
+  const api = await startLocalApi({
+    port: 0, snapshot, onApplication: async () => {},
+    onInvitation: async (c) => { code = c; },
+  });
+  try {
+    const res = await fetch(`http://127.0.0.1:${api.port}/invitation`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ invitation: '' }),
+    });
+    assert.equal(res.status, 400);
+    assert.equal(code, null);
+  } finally { await api.close(); }
+});
+
 test('GET /events returns a stream of events', async () => {
   const api = await startLocalApi({
     port: 0, snapshot, onApplication: async () => {}, onInvitation: async () => {},
