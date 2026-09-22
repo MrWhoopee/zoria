@@ -1,0 +1,11 @@
+{
+  "name": "zoria-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\"",
+    "agent": "node src/agent/main.ts"
+  }
+}
