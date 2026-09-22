@@ -3,7 +3,7 @@ import { saveState, type AgentState, type Application } from './store.ts';
 import type { EtherState } from '../protocol/ether.ts';
 
 export type RegistrarPhase =
-  | 'no-application' | 'no-invitation' | 'listening' | 'armed'
+  | 'no-application' | 'no-invitation' | 'listening'
   | 'registering' | 'lost' | 'registered' | 'blocked';
 
 export type RegistrarOptions = {
