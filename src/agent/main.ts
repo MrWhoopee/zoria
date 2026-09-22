@@ -5,7 +5,19 @@ import { Registrar } from './registrar.ts';
 import { startLocalApi } from './local-api.ts';
 import { KeyRing, makeStationKey } from '../protocol/keyring.ts';
 import { fetchRaw } from './http.ts';
+import { backoffMs } from './backoff.ts';
 import { msUntilOpen, serverNow } from '../protocol/ether.ts';
+import type { RawResponse } from '../protocol/classify.ts';
+
+process.on('unhandledRejection', (reason) => {
+  console.error('unhandled rejection:', reason instanceof Error ? reason.stack ?? reason.message : reason);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('uncaught exception:', err instanceof Error ? err.stack ?? err.message : err);
+  process.exit(1);
+});
 
 const config = loadConfig();
 
@@ -21,11 +33,24 @@ if (!config.fingerprint) {
 
 const ring = new KeyRing();
 
-const keyRes = await fetchRaw(`${config.api}/ether/key`, {}, config.requestTimeoutMs);
-if ('failed' in keyRes) {
-  console.error(`could not fetch the station key: ${keyRes.failed}`);
+const MAX_KEY_FETCH_ATTEMPTS = 20;
+
+async function fetchStationKey(): Promise<RawResponse> {
+  for (let attempt = 0; attempt < MAX_KEY_FETCH_ATTEMPTS; attempt += 1) {
+    const res = await fetchRaw(`${config.api}/ether/key`, {}, config.requestTimeoutMs);
+    if (!('failed' in res)) return res;
+    console.error(
+      `could not fetch the station key (attempt ${attempt + 1}/${MAX_KEY_FETCH_ATTEMPTS}): ${res.failed}`,
+    );
+    if (attempt < MAX_KEY_FETCH_ATTEMPTS - 1) {
+      await new Promise((r) => setTimeout(r, backoffMs(attempt)));
+    }
+  }
+  console.error(`giving up on the station key after ${MAX_KEY_FETCH_ATTEMPTS} attempts, exiting`);
   process.exit(1);
 }
+
+const keyRes = await fetchStationKey();
 
 let publicKey: string | null = null;
 try {

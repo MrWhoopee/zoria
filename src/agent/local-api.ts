@@ -81,8 +81,12 @@ export async function startLocalApi(opts: LocalApiOptions): Promise<{ port: numb
   await new Promise<void>((r) => server.listen(opts.port, '127.0.0.1', () => r()));
 
   const timer = setInterval(() => {
-    const payload = `data: ${JSON.stringify(opts.snapshot())}\n\n`;
-    for (const res of streams) res.write(payload);
+    try {
+      const payload = `data: ${JSON.stringify(opts.snapshot())}\n\n`;
+      for (const res of streams) res.write(payload);
+    } catch (err) {
+      console.error('SSE push failed:', err instanceof Error ? err.message : err);
+    }
   }, pushMs);
   timer.unref();
 
