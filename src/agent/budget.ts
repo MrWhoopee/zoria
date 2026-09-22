@@ -15,7 +15,12 @@ export class RateBudget {
     if (now <= this.#lastRefill) return;
     const gained = Math.floor((now - this.#lastRefill) / this.#refillMs);
     if (gained <= 0) return;
-    this.#tokens = Math.min(this.#capacity, this.#tokens + gained);
+    if (this.#tokens + gained >= this.#capacity) {
+      this.#tokens = this.#capacity;
+      this.#lastRefill = now;
+      return;
+    }
+    this.#tokens += gained;
     this.#lastRefill += gained * this.#refillMs;
   }
 
