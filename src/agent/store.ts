@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 
 export type Application = {
@@ -23,6 +24,8 @@ export type AgentState = {
   ether: { opensAt: string | null; closesAt: string | null; fragments: Record<number, string> };
 };
 
+const writeQueues = new Map<string, Promise<void>>();
+
 export function emptyState(): AgentState {
   return {
     application: null,
@@ -46,8 +49,14 @@ export async function loadState(path: string): Promise<AgentState> {
 }
 
 export async function saveState(path: string, state: AgentState): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.tmp`;
-  await writeFile(tmp, `${JSON.stringify(state, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-  await rename(tmp, path);
+  const body = `${JSON.stringify(state, null, 2)}\n`;
+  const previous = writeQueues.get(path) ?? Promise.resolve();
+  const next = previous.then(async () => {
+    await mkdir(dirname(path), { recursive: true });
+    const tmp = `${path}.${randomUUID()}.tmp`;
+    await writeFile(tmp, body, { encoding: 'utf8', mode: 0o600 });
+    await rename(tmp, path);
+  });
+  writeQueues.set(path, next.catch(() => {}));
+  return next;
 }
