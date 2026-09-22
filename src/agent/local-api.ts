@@ -27,6 +27,62 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+const USERNAME_RE = /^[a-z][a-z0-9_-]{2,31}$/;
+const LANGS = new Set(['uk', 'en']);
+
+function pointsInsideARepository(v: string): boolean {
+  const withoutOrigin = v.replace(/^https?:\/\/[^/]+\//i, '');
+  const trimmed = withoutOrigin.replace(/\/+$/, '');
+  const segments = trimmed.split('/');
+  return segments.length !== 2 || segments.some((s) => s.length === 0);
+}
+
+type ApplicationField = keyof Application;
+
+function validateApplication(v: unknown): { ok: true; value: Application } | { ok: false; field: ApplicationField | 'body' } {
+  if (typeof v !== 'object' || v === null) return { ok: false, field: 'body' };
+  const a = v as Record<string, unknown>;
+
+  if (typeof a.username !== 'string' || !USERNAME_RE.test(a.username)) {
+    return { ok: false, field: 'username' };
+  }
+  if (
+    typeof a.displayName !== 'string'
+    || a.displayName.length < 1 || a.displayName.length > 80
+    || a.displayName !== a.displayName.trim()
+  ) {
+    return { ok: false, field: 'displayName' };
+  }
+  if (typeof a.password !== 'string' || a.password.length < 12 || a.password.length > 256) {
+    return { ok: false, field: 'password' };
+  }
+  if (typeof a.invitation !== 'string' || a.invitation.length > 100) {
+    return { ok: false, field: 'invitation' };
+  }
+  if (
+    typeof a.repositoryUrl !== 'string'
+    || a.repositoryUrl.length === 0 || a.repositoryUrl.length > 256
+    || pointsInsideARepository(a.repositoryUrl)
+  ) {
+    return { ok: false, field: 'repositoryUrl' };
+  }
+  if (typeof a.lang !== 'string' || !LANGS.has(a.lang)) {
+    return { ok: false, field: 'lang' };
+  }
+
+  return {
+    ok: true,
+    value: {
+      username: a.username,
+      displayName: a.displayName,
+      password: a.password,
+      invitation: a.invitation,
+      repositoryUrl: a.repositoryUrl,
+      lang: a.lang as Application['lang'],
+    },
+  };
+}
+
 export async function startLocalApi(opts: LocalApiOptions): Promise<{ port: number; close(): Promise<void> }> {
   const pushMs = opts.pushMs ?? 1000;
   const streams = new Set<ServerResponse>();
@@ -56,8 +112,13 @@ export async function startLocalApi(opts: LocalApiOptions): Promise<{ port: numb
           return;
         }
         if (req.method === 'POST' && req.url === '/application') {
-          const parsed = JSON.parse(await readBody(req)) as Application;
-          await opts.onApplication(parsed);
+          const parsed: unknown = JSON.parse(await readBody(req));
+          const result = validateApplication(parsed);
+          if (!result.ok) {
+            send(400, { error: `invalid ${result.field}`, field: result.field });
+            return;
+          }
+          await opts.onApplication(result.value);
           send(204);
           return;
         }

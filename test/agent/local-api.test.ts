@@ -45,6 +45,91 @@ test('POST /application accepts the application', async () => {
   } finally { await api.close(); }
 });
 
+test('POST /application rejects a username that does not match the pattern', async () => {
+  let got: Application | null = null;
+  const api = await startLocalApi({
+    port: 0, snapshot,
+    onApplication: async (a) => { got = a; },
+    onInvitation: async () => {},
+  });
+  try {
+    const res = await fetch(`http://127.0.0.1:${api.port}/application`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...APP, username: 'North_Watch' }),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as { field: string };
+    assert.equal(body.field, 'username');
+    assert.equal(got, null, 'a bad username never reaches the registrar');
+  } finally { await api.close(); }
+});
+
+test('POST /application rejects a repositoryUrl that points inside a repository, not at its root', async () => {
+  let got: Application | null = null;
+  const api = await startLocalApi({
+    port: 0, snapshot,
+    onApplication: async (a) => { got = a; },
+    onInvitation: async () => {},
+  });
+  try {
+    const res = await fetch(`http://127.0.0.1:${api.port}/application`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...APP, repositoryUrl: 'https://github.com/north/zoria-client/blob/main/README.md' }),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as { field: string };
+    assert.equal(body.field, 'repositoryUrl');
+    assert.equal(got, null, 'a repository path never reaches the registrar');
+  } finally { await api.close(); }
+});
+
+test('POST /application accepts a full URL to the repository root', async () => {
+  let got: Application | null = null;
+  const api = await startLocalApi({
+    port: 0, snapshot,
+    onApplication: async (a) => { got = a; },
+    onInvitation: async () => {},
+  });
+  try {
+    const res = await fetch(`http://127.0.0.1:${api.port}/application`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...APP, repositoryUrl: 'https://github.com/north/zoria-client' }),
+    });
+    assert.equal(res.status, 204);
+    assert.equal((got as Application | null)?.repositoryUrl, 'https://github.com/north/zoria-client');
+  } finally { await api.close(); }
+});
+
+test('POST /application rejects a displayName with leading or trailing whitespace', async () => {
+  const api = await startLocalApi({
+    port: 0, snapshot, onApplication: async () => {}, onInvitation: async () => {},
+  });
+  try {
+    const res = await fetch(`http://127.0.0.1:${api.port}/application`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...APP, displayName: ' Northern Watch ' }),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as { field: string };
+    assert.equal(body.field, 'displayName');
+  } finally { await api.close(); }
+});
+
+test('POST /application rejects a password shorter than 12 characters', async () => {
+  const api = await startLocalApi({
+    port: 0, snapshot, onApplication: async () => {}, onInvitation: async () => {},
+  });
+  try {
+    const res = await fetch(`http://127.0.0.1:${api.port}/application`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...APP, password: 'short-pass' }),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as { field: string };
+    assert.equal(body.field, 'password');
+  } finally { await api.close(); }
+});
+
 test('POST /invitation delivers the code on the fly', async () => {
   let code: string | null = null;
   const api = await startLocalApi({
