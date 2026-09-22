@@ -65,7 +65,9 @@ const loop = new EtherLoop({
 loop.on((ether, obs) => {
   const mark = obs.t === 'signal' ? `signal ${obs.frame.phase}` : obs.t;
   console.log(`[${new Date().toISOString()}] ${mark} | phase=${ether.phase} | ${registrar.phase()}`);
-  void registrar.onEther(ether);
+  registrar.onEther(ether).catch((err: unknown) => {
+    console.error(`registrar failed: ${err instanceof Error ? err.message : String(err)}`);
+  });
 });
 
 loop.onError((err) => {
