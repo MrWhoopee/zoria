@@ -3,6 +3,7 @@ import type { EtherState } from '../protocol/ether.ts';
 import type { Application } from './store.ts';
 import type { RegistrarPhase } from './registrar.ts';
 import { isRepositoryRoot } from './repository-url.ts';
+import { readClientFile } from './static-files.ts';
 
 export type Snapshot = {
   ether: EtherState;
@@ -14,6 +15,7 @@ export type Snapshot = {
 
 export type LocalApiOptions = {
   port: number;
+  clientDir?: string;
   snapshot: () => Snapshot;
   onApplication: (a: Application) => Promise<void>;
   onInvitation: (code: string) => Promise<void>;
@@ -125,6 +127,14 @@ export async function startLocalApi(opts: LocalApiOptions): Promise<{ port: numb
           await opts.onInvitation(parsed.invitation);
           send(204);
           return;
+        }
+        if (req.method === 'GET' && opts.clientDir) {
+          const file = await readClientFile(opts.clientDir, req.url ?? '/');
+          if (file) {
+            res.writeHead(200, { 'content-type': file.type, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+            res.end(file.body);
+            return;
+          }
         }
         send(404, { error: 'not found' });
       } catch (err) {

@@ -106,6 +106,7 @@ loop.onError((err) => {
 
 const api = await startLocalApi({
   port: config.localPort,
+  clientDir: config.clientDir,
   snapshot: () => ({
     ether: loop.state(),
     registrar: registrar.phase(),
@@ -117,7 +118,7 @@ const api = await startLocalApi({
   onInvitation: (c) => registrar.setInvitation(c),
 });
 
-console.log(`agent listening on ${config.api}, local API at http://127.0.0.1:${api.port}`);
+console.log(`agent listening on ${config.api}, open http://127.0.0.1:${api.port}`);
 loop.start();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

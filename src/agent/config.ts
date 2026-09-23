@@ -7,6 +7,7 @@ export type Config = {
   rollIntervalMs: number;
   summaryIntervalMs: number;
   requestTimeoutMs: number;
+  clientDir: string;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -20,5 +21,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     rollIntervalMs: Number(env.ZORIA_ROLL_MS ?? 60_000),
     summaryIntervalMs: Number(env.ZORIA_SUMMARY_MS ?? 15_000),
     requestTimeoutMs: Number(env.ZORIA_TIMEOUT_MS ?? 20_000),
+    clientDir: env.ZORIA_CLIENT_DIR ?? 'dist/client',
   };
 }
