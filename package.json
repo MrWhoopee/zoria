@@ -3,9 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "test": "node --test \"test/**/*.test.ts\"",
-    "agent": "node src/agent/main.ts"
+    "agent": "node src/agent/main.ts",
+    "dev:client": "vite",
+    "build:client": "vite build",
+    "encode:photo": "node scripts/encode-photo.ts"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "sharp": "^0.35.4",
+    "vite": "^8.3.0"
   }
 }
