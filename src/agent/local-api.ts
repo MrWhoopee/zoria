@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { EtherState } from '../protocol/ether.ts';
 import type { Application } from './store.ts';
 import type { RegistrarPhase } from './registrar.ts';
+import { isRepositoryRoot } from './repository-url.ts';
 
 export type Snapshot = {
   ether: EtherState;
@@ -30,13 +31,6 @@ function readBody(req: IncomingMessage): Promise<string> {
 const USERNAME_RE = /^[a-z][a-z0-9_-]{2,31}$/;
 const LANGS = new Set(['uk', 'en']);
 
-function pointsInsideARepository(v: string): boolean {
-  const withoutOrigin = v.replace(/^https?:\/\/[^/]+\//i, '');
-  const trimmed = withoutOrigin.replace(/\/+$/, '');
-  const segments = trimmed.split('/');
-  return segments.length !== 2 || segments.some((s) => s.length === 0);
-}
-
 type ApplicationField = keyof Application;
 
 function validateApplication(v: unknown): { ok: true; value: Application } | { ok: false; field: ApplicationField | 'body' } {
@@ -62,7 +56,7 @@ function validateApplication(v: unknown): { ok: true; value: Application } | { o
   if (
     typeof a.repositoryUrl !== 'string'
     || a.repositoryUrl.length === 0 || a.repositoryUrl.length > 256
-    || pointsInsideARepository(a.repositoryUrl)
+    || !isRepositoryRoot(a.repositoryUrl)
   ) {
     return { ok: false, field: 'repositoryUrl' };
   }
