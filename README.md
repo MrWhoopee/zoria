@@ -5,33 +5,37 @@ registers the participant at the moment the window opens.
 
 ## Requirements
 
-Node.js 22.18 or newer. No dependencies — no build step either.
+Node.js 22.18 or newer. The agent itself has no dependencies; React and Vite are needed only to build the client.
 
 ## Running the agent
 
 ```bash
-npm install
-ZORIA_API=https://stand.zoria.net/api/v1 \
-ZORIA_KEY_FINGERPRINT=<fingerprint from the spec, section 3> \
+npm ci
+npm run build:client
+ZORIA_KEY_FINGERPRINT=dcb3155eb8f2538d466a294315e984fa9f67f703556c5e276d5b3afc88895696 npm run agent
+```
+
+On Windows PowerShell:
+
+```powershell
+npm ci
+npm run build:client
+$env:ZORIA_KEY_FINGERPRINT='dcb3155eb8f2538d466a294315e984fa9f67f703556c5e276d5b3afc88895696'
 npm run agent
 ```
 
+The fingerprint is the SHA-256 of the station's public key, published in part 1 of the spec, section 3. It is public; the agent refuses a key that does not match it.
+
 The production server is `https://zoria.net/api/v1` (the default); the
-learning stand is `https://stand.zoria.net/api/v1`. The address is set only
-through an environment variable: it is never hard-coded.
+learning stand is `https://stand.zoria.net/api/v1` and signs with its own key,
+`d8860c95b821dc56c0f44a2f0b22f3e157af83bfaed9e55206ac5109d4230a1a`. The
+address is set only through an environment variable: it is never hard-coded.
 
 ## The client
 
 The client is the radio room: press the red button, then type commands into the terminal.
 
-Build it once, then the agent serves it from its own port:
-
-```bash
-npm run build:client
-npm run agent
-```
-
-Open the address the agent prints, `http://127.0.0.1:4711` by default.
+The agent started as above serves the built client from its own port. Open the address it prints, `http://127.0.0.1:4711` by default. Without the agent the terminal shows `AGENT OFFLINE`.
 
 For development, run the agent against the practice stand with a separate state file, then start Vite, which forwards API requests to the agent:
 
