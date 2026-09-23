@@ -84,6 +84,11 @@ test('letter fragments are counted when the total is known', () => {
   assert.ok(lines.includes('LETTER   2/32'));
 });
 
+test('earlier letters are counted next to the current one', () => {
+  const lines = statusLines(snap({}, { fragments: { 1: 'a' }, fragmentsOf: 20, archive: [{ of: 32, fragments: {} }] }), NOW, 'UTC');
+  assert.ok(lines.includes('LETTER   1/20  +1 EARLIER'), lines.join('\n'));
+});
+
 test('a typical status fits the 46-column screen', () => {
   const lines = statusLines(snap({ msUntilOpen: OPENS - NOW }, { phase: 'static', opensAt: OPENS, fragmentsOf: 32 }), NOW, 'Europe/Kyiv');
   for (const l of lines) assert.ok(Array.from(l).length <= 46, l);
@@ -106,4 +111,13 @@ test('parseSnapshot accepts an agent snapshot and rejects anything else', () => 
   assert.equal(parseSnapshot('null'), null);
   assert.equal(parseSnapshot(JSON.stringify({ ether: {}, registrar: 'listening' })), null);
   assert.equal(parseSnapshot(JSON.stringify({ ether: { ribbon: [] } })), null);
+});
+
+test('a snapshot from an older agent without letter archive still renders', () => {
+  const s = snap({}, { fragments: { 1: 'a' }, fragmentsOf: 32 });
+  const { archive: _, ...older } = s.ether;
+  const parsed = parseSnapshot(JSON.stringify({ ...s, ether: older }));
+  assert.ok(parsed);
+  assert.deepEqual(parsed.ether.archive, []);
+  assert.ok(statusLines(parsed, NOW, 'UTC').includes('LETTER   1/32'));
 });

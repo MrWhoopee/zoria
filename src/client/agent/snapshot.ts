@@ -14,5 +14,6 @@ export function parseSnapshot(text: string): Snapshot | null {
   const ether = s.ether as Record<string, unknown> | null | undefined;
   if (typeof ether !== 'object' || ether === null || !Array.isArray(ether.ribbon)) return null;
   if (typeof s.registrar !== 'string') return null;
+  if (!Array.isArray(ether.archive)) ether.archive = [];
   return value as Snapshot;
 }

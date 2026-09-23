@@ -38,6 +38,9 @@ export function statusLines(s: Snapshot | null, nowMs: number, timeZone: string)
   if (e.silentUntil > nowMs) lines.push(`JAMMED   ${Math.ceil((e.silentUntil - nowMs) / 1000)}s`);
   lines.push(`SIGNAL   ${ribbonGlyphs(e.ribbon, 36)}`);
   lines.push(`REGISTER ${s.registrar}${s.blockedReason ? ` (${s.blockedReason})` : ''}`);
-  if (e.fragmentsOf !== null) lines.push(`LETTER   ${Object.keys(e.fragments).length}/${e.fragmentsOf}`);
+  if (e.fragmentsOf !== null) {
+    const earlier = e.archive.length > 0 ? `  +${e.archive.length} EARLIER` : '';
+    lines.push(`LETTER   ${Object.keys(e.fragments).length}/${e.fragmentsOf}${earlier}`);
+  }
   return lines;
 }

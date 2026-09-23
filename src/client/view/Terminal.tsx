@@ -4,10 +4,12 @@ import { SCREEN } from '../scene/geometry.ts';
 import { composeScreen, splitAtColumn } from '../terminal/grid.ts';
 import { helpLines, parseCommand } from '../terminal/commands.ts';
 import { formatLocal, statusLines } from '../terminal/status.ts';
+import { letterScreen } from '../terminal/letter.ts';
 import type { Snapshot } from '../agent/snapshot.ts';
 import { A } from '../anchors.ts';
 
 type Props = { scene: SceneState; snapshot: Snapshot | null; onShutdown: () => void };
+type View = { lines: string[] } | { letterPage: number } | null;
 
 const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const BOOT = ['ZORIA.NET TERMINAL', '', 'LINK ........ OK', 'ETHER ....... LISTENING'];
@@ -16,7 +18,7 @@ const pct = (n: number): string => `${n * 100}%`;
 
 export function Terminal({ scene, snapshot, onShutdown }: Props) {
   const [input, setInput] = useState('');
-  const [output, setOutput] = useState<string[] | null>(null);
+  const [output, setOutput] = useState<View>(null);
   const [now, setNow] = useState(() => Date.now());
   const crt = crtPhase(scene);
   const live = acceptsInput(scene);
@@ -39,9 +41,10 @@ export function Terminal({ scene, snapshot, onShutdown }: Props) {
       const cmd = parseCommand(raw);
       const echo = `> ${raw}`;
       if (cmd.kind === 'empty' || cmd.kind === 'status') setOutput(null);
-      else if (cmd.kind === 'help') setOutput([echo, ...helpLines()]);
+      else if (cmd.kind === 'help') setOutput({ lines: [echo, ...helpLines()] });
+      else if (cmd.kind === 'letter') setOutput({ letterPage: cmd.page });
       else if (cmd.kind === 'shutdown') onShutdown();
-      else setOutput([echo, `UNKNOWN COMMAND: ${cmd.word.toUpperCase()}`]);
+      else setOutput({ lines: [echo, `UNKNOWN COMMAND: ${cmd.word.toUpperCase()}`] });
     };
     const onKey = (e: KeyboardEvent): void => {
       if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -62,9 +65,15 @@ export function Terminal({ scene, snapshot, onShutdown }: Props) {
   }, [live, input, onShutdown]);
 
   const booting = crt === 'booting';
+  const body = (): string[] => {
+    if (booting) return BOOT;
+    if (output === null) return statusLines(snapshot, now, ZONE);
+    if ('lines' in output) return output.lines;
+    return snapshot === null ? statusLines(null, now, ZONE) : letterScreen(snapshot.ether, output.letterPage);
+  };
   const screen = composeScreen({
     header: booting ? [] : [`ZORIA.NET  ${formatLocal(now, ZONE)} ${ZONE}`, ''],
-    body: booting ? BOOT : output ?? statusLines(snapshot, now, ZONE),
+    body: body(),
     input: booting ? '' : input,
     hint: booting ? '' : HINT,
   });
