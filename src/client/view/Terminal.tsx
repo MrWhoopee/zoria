@@ -44,7 +44,7 @@ export function Terminal({ scene, snapshot, onShutdown }: Props) {
       else setOutput([echo, `UNKNOWN COMMAND: ${cmd.word.toUpperCase()}`]);
     };
     const onKey = (e: KeyboardEvent): void => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         run(input);
