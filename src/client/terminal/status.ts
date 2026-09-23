@@ -27,7 +27,9 @@ export function statusLines(s: Snapshot | null, nowMs: number, timeZone: string)
   const lines = [`PHASE    ${(e.phase ?? 'unknown').toUpperCase()}`];
   if (e.phase === 'window' && e.closesAt !== null) {
     lines.push(`CLOSES   ${formatLocal(e.closesAt, timeZone)} ${timeZone}`);
-  } else if (s.msUntilOpen !== null && e.opensAt !== null) {
+  } else if (s.msUntilOpen !== null && s.msUntilOpen <= 0 && e.closesAt !== null && e.closesAt <= nowMs) {
+    lines.push(`CLOSED   ${formatLocal(e.closesAt, timeZone)} ${timeZone}`);
+  } else if (s.msUntilOpen !== null && s.msUntilOpen > 0 && e.opensAt !== null) {
     lines.push(`OPENS    in ${formatDuration(s.msUntilOpen)}`);
     lines.push(`         ${formatLocal(e.opensAt, timeZone)} ${timeZone}`);
   } else {

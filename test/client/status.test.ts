@@ -47,6 +47,20 @@ test('during the window it shows when the window closes', () => {
   assert.ok(lines.includes('CLOSES   24.09 15:00 UTC'));
 });
 
+test('a window that has already passed says CLOSED instead of counting down to zero', () => {
+  const closes = OPENS + 10 * 3600_000;
+  const later = closes + 3600_000;
+  const lines = statusLines(snap({ msUntilOpen: OPENS - later }, { phase: 'after', opensAt: OPENS, closesAt: closes }), later, 'UTC');
+  assert.ok(lines.includes('CLOSED   24.09 15:00 UTC'), lines.join('\n'));
+  assert.ok(!lines.some((l) => l.includes('00:00:00')));
+});
+
+test('a past opening with no closing time is treated as unknown', () => {
+  const later = OPENS + 3600_000;
+  const lines = statusLines(snap({ msUntilOpen: OPENS - later }, { phase: 'static', opensAt: OPENS, closesAt: null }), later, 'UTC');
+  assert.ok(lines.includes('OPENS    unknown'), lines.join('\n'));
+});
+
 test('an active jam shows the seconds left; an expired one shows nothing', () => {
   const jammed = statusLines(snap({}, { silentUntil: NOW + 42_000 }), NOW, 'UTC');
   assert.ok(jammed.includes('JAMMED   42s'));
