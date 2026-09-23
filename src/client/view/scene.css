@@ -53,7 +53,7 @@ html, body, #root { margin: 0; height: 100%; background: #000; overflow: hidden;
 
 .keyboard { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .keyboard .key { position: absolute; background-repeat: no-repeat; transition: transform .08s, filter .08s; }
-.keyboard .key.down { transform: translateY(14%); filter: brightness(.7); box-shadow: inset 0 .25cqw .25cqw rgba(0, 0, 0, .55); transition: none; }
+.keyboard .key.down { transform: translateY(9%); filter: brightness(.84); box-shadow: inset 0 .12cqw .1cqw rgba(0, 0, 0, .4); transition: none; }
 
 .geometry-debug { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 9; pointer-events: none; }
 
