@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COLS, ROWS, composeScreen, fit } from '../../src/client/terminal/grid.ts';
+import { COLS, ROWS, composeScreen, fit, splitAtColumn } from '../../src/client/terminal/grid.ts';
 
 const width = (s: string): number => Array.from(s).length;
 
@@ -47,4 +47,10 @@ test('box-drawing and Cyrillic characters count as one column each', () => {
 test('an empty screen still shows the prompt', () => {
   const s = composeScreen({ header: [], body: [], input: '', hint: '' });
   assert.equal(s.lines[ROWS - 2].trimEnd(), '>');
+});
+
+test('splitting at the cursor column never cuts a character in half', () => {
+  assert.deepEqual(splitAtColumn('> AB  ', 4), ['> AB', ' ']);
+  assert.deepEqual(splitAtColumn('> 😀😀X', 3), ['> 😀', 'X']);
+  assert.deepEqual(splitAtColumn('> ', 2), ['> ', '']);
 });

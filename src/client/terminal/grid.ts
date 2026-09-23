@@ -31,3 +31,8 @@ export function composeScreen(parts: ScreenParts, cols = COLS, rows = ROWS): Scr
   lines.push(fit(parts.hint, cols));
   return { lines, cursor: { row: rows - 2, col: PROMPT.length + visible.length } };
 }
+
+export function splitAtColumn(line: string, col: number): [string, string] {
+  const chars = Array.from(line);
+  return [chars.slice(0, col).join(''), chars.slice(col + 1).join('')];
+}
