@@ -29,22 +29,22 @@ export function Lights({ lit, jammed, reducedMotion, onFlicker }: Props) {
       setLevels(METERS.map(() => (lit ? 0.8 : 0)));
       return;
     }
-    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const recover = new Map<string, ReturnType<typeof setTimeout>>();
     const tick = setInterval(() => {
       setLevels(meterLevels(METERS.length, Math.random));
       for (const ev of planFlickers(LAMP_IDS, Math.random, DEFAULT_FLICKER)) {
         flickerRef.current?.(ev);
         setDips((d) => ({ ...d, [ev.lamp]: ev.depth }));
-        const t = setTimeout(() => {
-          timers.delete(t);
+        clearTimeout(recover.get(ev.lamp));
+        recover.set(ev.lamp, setTimeout(() => {
+          recover.delete(ev.lamp);
           setDips((d) => without(d, ev.lamp));
-        }, ev.durationMs);
-        timers.add(t);
+        }, ev.durationMs));
       }
     }, 110);
     return () => {
       clearInterval(tick);
-      timers.forEach(clearTimeout);
+      recover.forEach(clearTimeout);
     };
   }, [lit, reducedMotion]);
 
