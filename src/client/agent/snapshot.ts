@@ -1,0 +1,18 @@
+import type { Snapshot } from '../../agent/local-api.ts';
+
+export type { Snapshot };
+
+export function parseSnapshot(text: string): Snapshot | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof value !== 'object' || value === null) return null;
+  const s = value as Record<string, unknown>;
+  const ether = s.ether as Record<string, unknown> | null | undefined;
+  if (typeof ether !== 'object' || ether === null || !Array.isArray(ether.ribbon)) return null;
+  if (typeof s.registrar !== 'string') return null;
+  return value as Snapshot;
+}
