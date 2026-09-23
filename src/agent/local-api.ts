@@ -92,6 +92,15 @@ export async function startLocalApi(opts: LocalApiOptions): Promise<{ port: numb
 
     void (async () => {
       try {
+        const port = req.socket.localPort;
+        if (req.headers.host !== `127.0.0.1:${port}` && req.headers.host !== `localhost:${port}`) {
+          send(403, { error: 'foreign host' });
+          return;
+        }
+        if (req.method === 'POST' && !(req.headers['content-type'] ?? '').startsWith('application/json')) {
+          send(415, { error: 'content-type must be application/json' });
+          return;
+        }
         if (req.method === 'GET' && req.url === '/state') {
           send(200, opts.snapshot());
           return;

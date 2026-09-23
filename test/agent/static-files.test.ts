@@ -108,3 +108,11 @@ test('without a client directory the root is a plain 404', async () => {
     await api.close();
   }
 });
+
+test('dotfiles and dot-directories are never served, even when the client dir is the project root', () => {
+  const root = join(tmpdir(), 'zoria-root');
+  assert.equal(resolveClientPath(root, '/.zoria-agent/state.json'), null);
+  assert.equal(resolveClientPath(root, '/.env'), null);
+  assert.equal(resolveClientPath(root, '/assets/.hidden'), null);
+  assert.equal(resolveClientPath(root, '/%2Ezoria-agent/state.json'), null);
+});

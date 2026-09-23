@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { request } from 'node:http';
 import { startLocalApi } from '../../src/agent/local-api.ts';
 import { initialEther } from '../../src/protocol/ether.ts';
 import type { Application } from '../../src/agent/store.ts';
@@ -188,5 +189,49 @@ test('GET /events returns a stream of events', async () => {
     const text = new TextDecoder().decode(chunk?.value);
     assert.match(text, /^data: /m);
     await reader?.cancel();
+  } finally { await api.close(); }
+});
+
+function raw(port: number, path: string, method: string, headers: Record<string, string>, body = ''): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port, path, method, headers }, (res) => {
+      res.resume();
+      res.on('end', () => resolve(res.statusCode ?? 0));
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+test('a cross-site text/plain POST cannot replace the application', async () => {
+  let called = false;
+  const api = await startLocalApi({
+    port: 0, snapshot,
+    onApplication: async () => { called = true; },
+    onInvitation: async () => { called = true; },
+  });
+  try {
+    const status = await raw(api.port, '/application', 'POST', { 'content-type': 'text/plain' }, JSON.stringify(APP));
+    assert.equal(status, 415);
+    const inv = await raw(api.port, '/invitation', 'POST', { 'content-type': 'text/plain' }, JSON.stringify({ invitation: 'x' }));
+    assert.equal(inv, 415);
+    assert.equal(called, false);
+  } finally { await api.close(); }
+});
+
+test('a request for a foreign host name is refused, so DNS rebinding cannot reach the api', async () => {
+  let called = false;
+  const api = await startLocalApi({
+    port: 0, snapshot,
+    onApplication: async () => { called = true; },
+    onInvitation: async () => {},
+  });
+  try {
+    const post = await raw(api.port, '/application', 'POST',
+      { 'content-type': 'application/json', host: `evil.example:${api.port}` }, JSON.stringify(APP));
+    assert.equal(post, 403);
+    assert.equal(await raw(api.port, '/state', 'GET', { host: 'evil.example' }), 403);
+    assert.equal(await raw(api.port, '/state', 'GET', { host: `localhost:${api.port}` }), 200);
+    assert.equal(called, false);
   } finally { await api.close(); }
 });

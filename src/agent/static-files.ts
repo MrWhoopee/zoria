@@ -23,6 +23,7 @@ export function resolveClientPath(clientDir: string, urlPath: string): string | 
     return null;
   }
   if (path.includes('\0') || path.includes('\\')) return null;
+  if (path.split('/').some((segment) => segment.startsWith('.'))) return null;
   if (path === '/' || path === '') path = '/index.html';
   const root = resolve(clientDir);
   const full = resolve(root, `.${path}`);

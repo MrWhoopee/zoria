@@ -26,9 +26,8 @@ const config = loadConfig();
 if (!config.fingerprint) {
   console.error(
     'ZORIA_KEY_FINGERPRINT is not set.\n' +
-    'The station key fingerprint is published in the spec, part 1, section 3.\n' +
-    'For a test stand, use the learning fingerprint:\n' +
-    '  ZORIA_KEY_FINGERPRINT=f3a436df65614f08635f18fe0f64f145285203f1faa2905ecb25ffb90969a7de',
+    'The live station key fingerprint is published in the spec, part 1, section 3.\n' +
+    'The stand signs with its own key; its fingerprint is in the README.',
   );
   process.exit(1);
 }
