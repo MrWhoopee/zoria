@@ -62,6 +62,8 @@ export function createAudioEngine(urls: Partial<Record<SampleName, string>>): Au
   function setLit(on: boolean): void {
     lit = on;
     if (!ctx || !hum) return;
+    hum.gain.cancelScheduledValues(ctx.currentTime);
+    hum.gain.setValueAtTime(hum.gain.value, ctx.currentTime);
     hum.gain.setTargetAtTime(on ? HUM_LEVEL : 0, ctx.currentTime, on ? 0.4 : 0.15);
   }
 

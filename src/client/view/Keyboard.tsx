@@ -20,7 +20,7 @@ export function Keyboard({ active, onKey }: { active: boolean; onKey?: (code: st
       return;
     }
     const press = (e: KeyboardEvent): void => {
-      if (!KEYBOARD.has(e.code) || e.repeat) return;
+      if (!KEYBOARD.has(e.code) || e.repeat || e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
       keyRef.current?.(e.code);
       setDown((s) => new Set(s).add(e.code));
     };

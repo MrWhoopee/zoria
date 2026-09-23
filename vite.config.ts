@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [react()],
   build: { outDir: '../../dist/client', emptyOutDir: true },
   server: {
+    fs: { allow: ['src/client', 'node_modules'], deny: ['.zoria-agent/**', '.env', '.env.*', '**/.git/**'] },
     proxy: {
       '/state': agent,
       '/events': agent,
