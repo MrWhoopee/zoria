@@ -14,13 +14,14 @@ export type EtherLoopOptions = {
   refillMs: number;
   now?: () => number;
   rand?: () => number;
+  initial?: EtherState;
 };
 
 type Listener = (s: EtherState, o: Observation) => void;
 type ErrorListener = (err: unknown) => void;
 
 export class EtherLoop {
-  readonly #opts: Required<EtherLoopOptions>;
+  readonly #opts: Required<Omit<EtherLoopOptions, 'initial'>>;
   readonly #budget: RateBudget;
   #state: EtherState = initialEther();
   #failures = 0;
@@ -32,6 +33,7 @@ export class EtherLoop {
   constructor(opts: EtherLoopOptions) {
     this.#opts = { now: Date.now, rand: Math.random, ...opts };
     this.#budget = new RateBudget({ capacity: opts.capacity, refillMs: opts.refillMs });
+    this.#state = opts.initial ?? initialEther();
   }
 
   state(): EtherState { return this.#state; }

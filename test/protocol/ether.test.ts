@@ -162,3 +162,24 @@ test('msUntilOpen returns null without opensAt', () => {
   const s = initialEther();
   assert.equal(msUntilOpen(s, 1000), null);
 });
+
+test('a fragment of a letter with a different size starts a new letter and keeps the old one', () => {
+  let s = initialEther();
+  s = reduceEther(s, signal(frame({ fragment: { n: 1, of: 12, text: 'old first' } }), 0));
+  s = reduceEther(s, signal(frame({
+    at: new Date(T0 + 1000).toISOString(),
+    fragment: { n: 2, of: 20, text: 'new second' },
+  }), 1000));
+  assert.deepEqual(s.fragments, { 2: 'new second' });
+  assert.equal(s.fragmentsOf, 20);
+  assert.deepEqual(s.archive, [{ of: 12, fragments: { 1: 'old first' } }]);
+});
+
+test('a frame without a fragment keeps the letter as it is', () => {
+  let s = initialEther();
+  s = reduceEther(s, signal(frame({ fragment: { n: 1, of: 12, text: 'first' } }), 0));
+  s = reduceEther(s, signal(frame({ at: new Date(T0 + 1000).toISOString() }), 1000));
+  assert.deepEqual(s.fragments, { 1: 'first' });
+  assert.equal(s.fragmentsOf, 12);
+  assert.deepEqual(s.archive, []);
+});

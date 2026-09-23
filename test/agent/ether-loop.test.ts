@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { startNoiseServer } from './noise-server.ts';
 import { EtherLoop } from '../../src/agent/ether-loop.ts';
+import { initialEther } from '../../src/protocol/ether.ts';
 import { makeStationKey, KeyRing } from '../../src/protocol/keyring.ts';
 import { LEARNING_PUBLIC_KEY, LEARNING_FINGERPRINT } from '../fixtures/frames.ts';
 
@@ -243,4 +244,15 @@ test('the local backoff gate blocks a second request while the pause has not ela
   } finally {
     await noise.close();
   }
+});
+
+test('a loop restored after a restart starts with the letter it had collected', async () => {
+  const ring = new KeyRing();
+  ring.add(await makeStationKey(LEARNING_PUBLIC_KEY, LEARNING_FINGERPRINT));
+  const loop = new EtherLoop({
+    api: 'http://127.0.0.1:9', ring, timeoutMs: 2000, intervalMs: 15_000, capacity: 20, refillMs: 3000,
+    initial: { ...initialEther(), fragments: { 3: 'third' }, fragmentsOf: 32 },
+  });
+  assert.deepEqual(loop.state().fragments, { 3: 'third' });
+  assert.equal(loop.state().fragmentsOf, 32);
 });

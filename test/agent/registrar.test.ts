@@ -380,3 +380,25 @@ test('after success there are no repeat registration requests', async () => {
     assert.equal(hits.filter((h) => h === '/auth/register').length, 1);
   } finally { server.close(); }
 });
+
+test('the letter it remembers and the registration it saves never overwrite each other', async () => {
+  const srv = await api({
+    '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })],
+  });
+  const path = await statePath();
+  try {
+    const r = new Registrar({
+      api: srv.url, statePath: path, sleep: instantSleep(),
+      state: { ...emptyState(), application: APP },
+    });
+    const letter = { opensAt: null, closesAt: null, fragments: { 3: 'third' }, fragmentsOf: 32, archive: [] };
+    const remembering = r.remember(letter);
+    await r.onEther(windowOpen());
+    await remembering;
+    await r.remember({ ...letter, fragments: { 3: 'third', 4: 'fourth' } });
+    const saved = await loadState(path);
+    assert.equal(saved.registration.token, SESSION.token);
+    assert.deepEqual(saved.ether.fragments, { 3: 'third', 4: 'fourth' });
+    assert.equal(r.phase(), 'registered');
+  } finally { srv.server.close(); }
+});

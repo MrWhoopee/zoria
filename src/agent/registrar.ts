@@ -79,6 +79,11 @@ export class Registrar {
     }
   }
 
+  async remember(ether: AgentState['ether']): Promise<void> {
+    this.#state = { ...this.#state, ether };
+    await saveState(this.#opts.statePath, this.#state);
+  }
+
   async setInvitation(code: string): Promise<void> {
     if (!this.#state.application) throw new Error('application is not set');
     await this.setApplication({ ...this.#state.application, invitation: code });
@@ -106,12 +111,8 @@ export class Registrar {
   }
 
   async #persist(patch: Partial<AgentState['registration']>): Promise<void> {
-    const next: AgentState = {
-      ...this.#state,
-      registration: { ...this.#state.registration, ...patch },
-    };
-    await saveState(this.#opts.statePath, next);
-    this.#state = next;
+    this.#state = { ...this.#state, registration: { ...this.#state.registration, ...patch } };
+    await saveState(this.#opts.statePath, this.#state);
   }
 
   async #register(): Promise<void> {

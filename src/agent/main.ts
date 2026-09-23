@@ -3,6 +3,7 @@ import { loadState } from './store.ts';
 import { EtherLoop } from './ether-loop.ts';
 import { Registrar } from './registrar.ts';
 import { startLocalApi } from './local-api.ts';
+import { rememberEther, restoreEther, sameMemory } from './memory.ts';
 import { KeyRing, makeStationKey } from '../protocol/keyring.ts';
 import { fetchRaw } from './http.ts';
 import { backoffMs } from './backoff.ts';
@@ -89,11 +90,21 @@ const loop = new EtherLoop({
   capacity: 20,
   refillMs: 3000,
   now: monotonicNow,
+  initial: restoreEther(state.ether),
 });
+
+let memory = state.ether;
 
 loop.on((ether, obs) => {
   const mark = obs.t === 'signal' ? `signal ${obs.frame.phase}` : obs.t;
   console.log(`[${new Date(monotonicNow()).toISOString()}] ${mark} | phase=${ether.phase} | ${registrar.phase()}`);
+  const next = rememberEther(ether);
+  if (!sameMemory(memory, next)) {
+    memory = next;
+    registrar.remember(next).catch((err: unknown) => {
+      console.error(`could not save the letter: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }
   registrar.onEther(ether).catch((err: unknown) => {
     console.error(`registrar failed: ${err instanceof Error ? err.message : String(err)}`);
   });

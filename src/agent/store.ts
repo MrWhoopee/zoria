@@ -1,6 +1,7 @@
 import { mkdir, open, readFile, rename } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
+import { emptyMemory, type EtherMemory } from './memory.ts';
 
 export type Application = {
   username: string;
@@ -21,7 +22,7 @@ export type Registration = {
 export type AgentState = {
   application: Application | null;
   registration: Registration;
-  ether: { opensAt: string | null; closesAt: string | null; fragments: Record<number, string> };
+  ether: EtherMemory;
 };
 
 const writeQueues = new Map<string, Promise<void>>();
@@ -30,7 +31,7 @@ export function emptyState(): AgentState {
   return {
     application: null,
     registration: { attemptedAt: null, token: null, sessionId: null, expiresAt: null },
-    ether: { opensAt: null, closesAt: null, fragments: {} },
+    ether: emptyMemory(),
   };
 }
 

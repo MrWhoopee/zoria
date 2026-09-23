@@ -3,6 +3,8 @@ import type { Observation } from './classify.ts';
 
 export type Mark = 'signal' | 'noise' | 'forgery' | 'silence' | 'jam';
 
+export type Letter = { of: number | null; fragments: Record<number, string> };
+
 const RIBBON_MAX = 240;
 
 export type EtherState = {
@@ -14,6 +16,7 @@ export type EtherState = {
   onAir: number;
   fragments: Record<number, string>;
   fragmentsOf: number | null;
+  archive: Letter[];
   silentUntil: number;
   ribbon: Mark[];
 };
@@ -22,7 +25,7 @@ export function initialEther(): EtherState {
   return {
     phase: null, lastFrameAt: null, skewMs: 0,
     opensAt: null, closesAt: null, onAir: 0,
-    fragments: {}, fragmentsOf: null,
+    fragments: {}, fragmentsOf: null, archive: [],
     silentUntil: 0, ribbon: [],
   };
 }
@@ -55,7 +58,9 @@ export function reduceEther(s: EtherState, o: Observation): EtherState {
   }
 
   const f = o.frame;
-  const fragments = { ...s.fragments };
+  const newLetter = f.fragment !== null && s.fragmentsOf !== null && f.fragment.of !== s.fragmentsOf;
+  const archive = newLetter ? [...s.archive, { of: s.fragmentsOf, fragments: s.fragments }] : s.archive;
+  const fragments = newLetter ? {} : { ...s.fragments };
   if (f.fragment && fragments[f.fragment.n] === undefined) {
     fragments[f.fragment.n] = f.fragment.text;
   }
@@ -79,6 +84,7 @@ export function reduceEther(s: EtherState, o: Observation): EtherState {
     onAir: f.onAir,
     fragments,
     fragmentsOf: f.fragment ? f.fragment.of : s.fragmentsOf,
+    archive,
     ribbon,
   };
 }
