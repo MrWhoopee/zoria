@@ -41,6 +41,8 @@ export function App() {
   const onStepBack = useCallback(() => dispatch({ type: 'stepBack' }), []);
   const onApproach = useCallback(() => dispatch({ type: 'approach' }), []);
   const onOpenNotebook = useCallback(() => dispatch({ type: 'openNotebook' }), []);
+  const onCloseNotebook = useCallback(() => dispatch({ type: 'closeNotebook' }), []);
+  const onTurnPage = useCallback(() => undefined, []);
 
   useEffect(() => {
     if (scene !== 'room') return;
@@ -63,6 +65,8 @@ export function App() {
       onStepBack={onStepBack}
       onApproach={onApproach}
       onOpenNotebook={onOpenNotebook}
+      onCloseNotebook={onCloseNotebook}
+      onTurnPage={onTurnPage}
       onFlicker={onFlicker}
       onKey={onKey}
     />

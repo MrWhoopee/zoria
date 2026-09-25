@@ -13,6 +13,7 @@ import { Keyboard } from './Keyboard.tsx';
 import { GeometryDebug } from './GeometryDebug.tsx';
 import { Hotspot } from './Hotspot.tsx';
 import { Hint } from './Hint.tsx';
+import { Notebook } from './Notebook.tsx';
 
 export type StageProps = {
   scene: SceneState;
@@ -23,11 +24,13 @@ export type StageProps = {
   onStepBack: () => void;
   onApproach: () => void;
   onOpenNotebook: () => void;
+  onCloseNotebook: () => void;
+  onTurnPage: () => void;
   onFlicker?: (e: FlickerEvent) => void;
   onKey?: (code: string) => void;
 };
 
-export function Stage({ scene, snapshot, reducedMotion, onPress, onShutdown, onStepBack, onApproach, onOpenNotebook, onFlicker, onKey }: StageProps) {
+export function Stage({ scene, snapshot, reducedMotion, onPress, onShutdown, onStepBack, onApproach, onOpenNotebook, onCloseNotebook, onTurnPage, onFlicker, onKey }: StageProps) {
   const classes = ['stage', isLit(scene) && 'lit', isZoomed(scene) && 'zoomed'].filter(Boolean).join(' ');
   const world = {
     transformOrigin: `${ZOOM.origin.x * 100}% ${ZOOM.origin.y * 100}%`,
@@ -51,6 +54,14 @@ export function Stage({ scene, snapshot, reducedMotion, onPress, onShutdown, onS
         )}
         <GeometryDebug />
       </div>
+      <Notebook
+        scene={scene}
+        stages={snapshot?.account?.stages ?? []}
+        zone={Intl.DateTimeFormat().resolvedOptions().timeZone}
+        reducedMotion={reducedMotion}
+        onClose={onCloseNotebook}
+        onTurn={onTurnPage}
+      />
       <Hint scene={scene} />
     </div>
   );
