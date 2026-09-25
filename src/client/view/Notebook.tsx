@@ -55,7 +55,7 @@ function Stamp({ stageId, acknowledgedAt, zone }: { stageId: string; acknowledge
 
   useEffect(() => () => ctrl.current?.abort(), []);
 
-  if (acknowledgedAt) return <div className="nb-stamp done">RECEIVED {whenLocal(acknowledgedAt, zone)}</div>;
+  if (acknowledgedAt) return <div className="nb-stamp done">ОТРИМАНО {whenLocal(acknowledgedAt, zone)}</div>;
   const press = (): void => {
     ctrl.current?.abort();
     const c = new AbortController();
@@ -63,12 +63,12 @@ function Stamp({ stageId, acknowledgedAt, zone }: { stageId: string; acknowledge
     setState({ busy: true, error: null });
     ackStage(stageId, c.signal)
       .then((o) => { if (!c.signal.aborted) setState({ busy: false, error: o.ok ? null : describeFailure(o).join('  ') }); })
-      .catch((err: unknown) => { if (!c.signal.aborted) setState({ busy: false, error: err instanceof Error ? err.message : 'FAILED' }); });
+      .catch((err: unknown) => { if (!c.signal.aborted) setState({ busy: false, error: err instanceof Error ? err.message : 'НЕ ВДАЛОСЯ' }); });
   };
   return (
     <div className="nb-stamp">
       <button type="button" data-zaria={A.notebookAck} disabled={state.busy} onClick={press}>
-        {state.busy ? 'STAMPING...' : 'ACKNOWLEDGE RECEIPT'}
+        {state.busy ? 'СТАВЛЮ ПЕЧАТКУ…' : 'ПІДТВЕРДИТИ ОТРИМАННЯ'}
       </button>
       {state.error && <span className="nb-stamp-error">{state.error}</span>}
     </div>
@@ -80,8 +80,8 @@ function PageView({ page, zone, onJump }: { page: Page | undefined; zone: string
   if (page?.kind === 'contents') {
     content = (
       <>
-        <h2 className="nb-title">PARTS OF THE TASK</h2>
-        {page.entries.length === 0 && <p className="nb-p">Nothing released yet. Parts arrive through the API only.</p>}
+        <h2 className="nb-title">ЗАВДАННЯ ВІД СТАНЦІЇ</h2>
+        {page.entries.length === 0 && <p className="nb-p">Ефір поки мовчить. Частини завдання приходять лише зі станції.</p>}
         <ol className="nb-contents">
           {page.entries.map((e) => (
             <li key={e.id}>
@@ -89,8 +89,8 @@ function PageView({ page, zone, onJump }: { page: Page | undefined; zone: string
                 {e.position}. {e.title}
               </button>
               <span className="nb-meta">
-                given {whenLocal(e.releasedAt, zone)} · {e.acknowledgedAt ? 'received' : 'NEW'}
-                {e.errataAt ? ` · errata ${whenLocal(e.errataAt, zone)}` : ''}
+                прийнято {whenLocal(e.releasedAt, zone)} · {e.acknowledgedAt ? 'отримання підтверджено' : 'нове'}
+                {e.errataAt ? ` · уточнення ${whenLocal(e.errataAt, zone)}` : ''}
               </span>
             </li>
           ))}
@@ -98,7 +98,7 @@ function PageView({ page, zone, onJump }: { page: Page | undefined; zone: string
       </>
     );
   } else if (page?.kind === 'waiting') {
-    content = <><h2 className="nb-title">{page.position}. {page.title}</h2><p className="nb-p">The text is on its way…</p></>;
+    content = <><h2 className="nb-title">{page.position}. {page.title}</h2><p className="nb-p">Текст ще йде ефіром…</p></>;
   } else if (page?.kind === 'stage') {
     content = (
       <>
@@ -108,7 +108,7 @@ function PageView({ page, zone, onJump }: { page: Page | undefined; zone: string
             <Stamp stageId={page.stageId} acknowledgedAt={page.acknowledgedAt} zone={zone} />
             {page.errata && (
               <aside className="nb-errata" data-zaria={A.notebookErrata}>
-                <strong>ERRATA</strong> {page.errata}
+                <strong>УТОЧНЕННЯ</strong> {page.errata}
               </aside>
             )}
           </>
@@ -173,8 +173,8 @@ export function Notebook({ scene, stages, zone, reducedMotion, onClose, onTurn }
         <PageView page={pages[current * 2]} zone={zone} onJump={(p) => go(Math.floor(p / 2))} />
         <PageView page={pages[current * 2 + 1]} zone={zone} onJump={(p) => go(Math.floor(p / 2))} />
         {turn && <div className={`nb-leaf ${turn}`} />}
-        <button type="button" className="nb-edge prev" data-zaria={A.notebookPrev} aria-label="Previous pages" disabled={current === 0} onClick={() => go(current - 1)} />
-        <button type="button" className="nb-edge next" data-zaria={A.notebookNext} aria-label="Next pages" disabled={current >= spreads - 1} onClick={() => go(current + 1)} />
+        <button type="button" className="nb-edge prev" data-zaria={A.notebookPrev} aria-label="Попередні сторінки" disabled={current === 0} onClick={() => go(current - 1)} />
+        <button type="button" className="nb-edge next" data-zaria={A.notebookNext} aria-label="Наступні сторінки" disabled={current >= spreads - 1} onClick={() => go(current + 1)} />
         <div className="nb-folio">{current * 2 + 1}–{current * 2 + 2} / {pages.length}</div>
       </div>
     </div>
