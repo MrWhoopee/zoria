@@ -1,4 +1,6 @@
 import test from 'node:test';
+import { createServer } from 'node:http';
+import { sealFrame, GENERATED_PUBLIC_KEY, GENERATED_FINGERPRINT, GENERATED_KEY_ID } from '../fixtures/sign.ts';
 import assert from 'node:assert/strict';
 import { startNoiseServer } from './noise-server.ts';
 import { EtherLoop } from '../../src/agent/ether-loop.ts';
@@ -255,4 +257,75 @@ test('a loop restored after a restart starts with the letter it had collected', 
   });
   assert.deepEqual(loop.state().fragments, { 3: 'third' });
   assert.equal(loop.state().fragmentsOf, 32);
+});
+
+async function rollServer(respond: () => { status: number; body: string; retryAfter?: number }) {
+  let hits = 0;
+  const server = createServer((req, res) => {
+    hits += 1;
+    const out = respond();
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (out.retryAfter !== undefined) headers['retry-after'] = String(out.retryAfter);
+    res.writeHead(out.status, headers);
+    res.end(out.body);
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const addr = server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : 0;
+  return { url: `http://127.0.0.1:${port}`, hits: () => hits, close: () => new Promise<void>((r) => server.close(() => r())) };
+}
+
+async function signedRoll(): Promise<string> {
+  const frame = JSON.stringify({
+    v: 1, kind: 'roll', station: 'zoria', at: '2026-09-25T05:10:00.000Z', phase: 'window',
+    window: { opensAt: '2026-09-25T05:00:00.000Z', closesAt: '2026-09-25T17:00:00.000Z' },
+    harbinger: null, fragment: null, onAir: 2,
+    roll: [{ n: 1, at: '2026-09-25T05:00:00.100Z', sinceOpen: 0, name: 'North' }, { n: 2, at: '2026-09-25T05:00:00.300Z', sinceOpen: 0, name: 'MrWhoopee' }],
+  });
+  return JSON.stringify({ frame, seal: await sealFrame(frame), key: GENERATED_KEY_ID });
+}
+
+async function generatedLoop(url: string, now: () => number): Promise<EtherLoop> {
+  const ring = new KeyRing();
+  ring.add(await makeStationKey(GENERATED_PUBLIC_KEY, GENERATED_FINGERPRINT));
+  return new EtherLoop({ api: url, ring, timeoutMs: 2000, intervalMs: 15_000, capacity: 20, refillMs: 3000, now, rand: () => 0 });
+}
+
+test('the roll is read from a sealed frame and not more than once a minute', async () => {
+  const body = await signedRoll();
+  const srv = await rollServer(() => ({ status: 200, body }));
+  try {
+    let clock = 0;
+    const loop = await generatedLoop(srv.url, () => clock);
+    const first = await loop.roll();
+    assert.ok(first.ok);
+    if (first.ok) assert.deepEqual(first.entries.map((e) => e.name), ['North', 'MrWhoopee']);
+    clock += 30_000;
+    assert.ok((await loop.roll()).ok);
+    assert.equal(srv.hits(), 1);
+    clock += 30_000;
+    await loop.roll();
+    assert.equal(srv.hits(), 2);
+  } finally { await srv.close(); }
+});
+
+test('a forged roll is not shown', async () => {
+  const srv = await rollServer(() => ({ status: 200, body: JSON.stringify({ frame: '{}', seal: 'AAAA', key: GENERATED_KEY_ID }) }));
+  try {
+    const loop = await generatedLoop(srv.url, () => 0);
+    const r = await loop.roll();
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.reason, 'noise');
+  } finally { await srv.close(); }
+});
+
+test('a jam on the roll silences the ether as well', async () => {
+  const srv = await rollServer(() => ({ status: 429, body: '{"error":{"code":"jammed"}}', retryAfter: 30 }));
+  try {
+    const loop = await generatedLoop(srv.url, () => 0);
+    const r = await loop.roll();
+    assert.equal(r.ok, false);
+    assert.equal(loop.state().silentUntil, 30_000);
+    assert.equal(loop.state().silentWhy, 'jam');
+  } finally { await srv.close(); }
 });

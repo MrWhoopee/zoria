@@ -18,6 +18,7 @@ export type EtherState = {
   fragmentsOf: number | null;
   archive: Letter[];
   silentUntil: number;
+  silentWhy: 'jam' | 'stop' | null;
   ribbon: Mark[];
 };
 
@@ -26,7 +27,7 @@ export function initialEther(): EtherState {
     phase: null, lastFrameAt: null, skewMs: 0,
     opensAt: null, closesAt: null, onAir: 0,
     fragments: {}, fragmentsOf: null, archive: [],
-    silentUntil: 0, ribbon: [],
+    silentUntil: 0, silentWhy: null, ribbon: [],
   };
 }
 
@@ -37,13 +38,15 @@ function push(ribbon: Mark[], mark: Mark): Mark[] {
 }
 
 export function reduceEther(s: EtherState, o: Observation): EtherState {
-  if (o.t === 'jammed') {
-    const until = Math.max(s.silentUntil, o.receivedAt + o.retryAfterMs);
-    return { ...s, silentUntil: until, ribbon: push(s.ribbon, 'jam') };
-  }
-  if (o.t === 'stopping') {
-    const until = Math.max(s.silentUntil, o.receivedAt + o.retryAfterMs);
-    return { ...s, silentUntil: until, ribbon: push(s.ribbon, 'silence') };
+  if (o.t === 'jammed' || o.t === 'stopping') {
+    const end = o.receivedAt + o.retryAfterMs;
+    const why = o.t === 'jammed' ? 'jam' : 'stop';
+    return {
+      ...s,
+      silentUntil: Math.max(s.silentUntil, end),
+      silentWhy: end >= s.silentUntil ? why : s.silentWhy,
+      ribbon: push(s.ribbon, o.t === 'jammed' ? 'jam' : 'silence'),
+    };
   }
   if (o.t === 'silence') {
     return { ...s, ribbon: push(s.ribbon, 'silence') };

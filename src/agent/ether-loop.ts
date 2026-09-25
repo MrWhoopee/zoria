@@ -4,6 +4,7 @@ import { fetchRaw } from './http.ts';
 import { classifyResponse, type Observation } from '../protocol/classify.ts';
 import { initialEther, reduceEther, type EtherState } from '../protocol/ether.ts';
 import type { KeyRing } from '../protocol/keyring.ts';
+import type { RollEntry } from '../protocol/types.ts';
 
 export type EtherLoopOptions = {
   api: string;
@@ -17,6 +18,12 @@ export type EtherLoopOptions = {
   initial?: EtherState;
 };
 
+export type RollResult =
+  | { ok: true; entries: RollEntry[]; at: number }
+  | { ok: false; reason: 'too-soon' | 'silent' | 'budget' | 'jammed' | 'stopping' | 'noise' | 'timeout' | 'network'; retryInMs: number };
+
+const ROLL_EVERY_MS = 60_000;
+
 type Listener = (s: EtherState, o: Observation) => void;
 type ErrorListener = (err: unknown) => void;
 
@@ -29,6 +36,8 @@ export class EtherLoop {
   #timer: NodeJS.Timeout | null = null;
   #listeners: Listener[] = [];
   #errorListeners: ErrorListener[] = [];
+  #roll: { entries: RollEntry[]; at: number } | null = null;
+  #rollTriedAt: number | null = null;
 
   constructor(opts: EtherLoopOptions) {
     this.#opts = { now: Date.now, rand: Math.random, ...opts };
@@ -68,6 +77,32 @@ export class EtherLoop {
     const o = await classifyResponse(raw, this.#opts.ring);
     if (o.t !== 'stopping' && o.t !== 'jammed') this.#failures = 0;
     this.#emit(o);
+  }
+
+  async roll(): Promise<RollResult> {
+    const now = this.#opts.now();
+    if (this.#rollTriedAt !== null && now - this.#rollTriedAt < ROLL_EVERY_MS) {
+      if (this.#roll) return { ok: true, entries: this.#roll.entries, at: this.#roll.at };
+      return { ok: false, reason: 'too-soon', retryInMs: this.#rollTriedAt + ROLL_EVERY_MS - now };
+    }
+    const quietUntil = Math.max(this.#blockedUntil, this.#state.silentUntil);
+    if (now < quietUntil) return { ok: false, reason: 'silent', retryInMs: quietUntil - now };
+    if (!this.#budget.tryTake(now)) return { ok: false, reason: 'budget', retryInMs: this.#budget.msUntilToken(now) };
+
+    this.#rollTriedAt = now;
+    const raw = await fetchRaw(`${this.#opts.api}/ether/roll`, {}, this.#opts.timeoutMs, this.#opts.now);
+    if ('failed' in raw) return { ok: false, reason: raw.failed, retryInMs: ROLL_EVERY_MS };
+
+    const o = await classifyResponse(raw, this.#opts.ring);
+    if (o.t === 'jammed' || o.t === 'stopping') {
+      this.#emit(o);
+      return { ok: false, reason: o.t, retryInMs: o.retryAfterMs };
+    }
+    if (o.t !== 'signal' || o.frame.kind !== 'roll') return { ok: false, reason: 'noise', retryInMs: ROLL_EVERY_MS };
+
+    const entries = (o.frame.roll ?? []).filter((e) => Number.isInteger(e.n) && typeof e.name === 'string');
+    this.#roll = { entries, at: now };
+    return { ok: true, entries, at: now };
   }
 
   start(): void {

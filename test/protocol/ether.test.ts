@@ -183,3 +183,12 @@ test('a frame without a fragment keeps the letter as it is', () => {
   assert.equal(s.fragmentsOf, 12);
   assert.deepEqual(s.archive, []);
 });
+
+test('a jam and a server restart are told apart', () => {
+  const jammed = reduceEther(initialEther(), { t: 'jammed', retryAfterMs: 30_000, receivedAt: 0 });
+  assert.equal(jammed.silentWhy, 'jam');
+  const stopping = reduceEther(initialEther(), { t: 'stopping', retryAfterMs: 30_000, receivedAt: 0 });
+  assert.equal(stopping.silentWhy, 'stop');
+  const both = reduceEther(jammed, { t: 'stopping', retryAfterMs: 5_000, receivedAt: 0 });
+  assert.equal(both.silentWhy, 'jam', 'the longer silence names the reason');
+});
