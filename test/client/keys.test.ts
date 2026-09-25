@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { keyPatch, type Quad } from '../../src/client/scene/keys.ts';
 import { KEYBOARD } from '../../src/client/scene/keyboard-map.ts';
-import { GLASS, fromPhoto, glassMaskDataUri } from '../../src/client/scene/geometry.ts';
+import { GLASS, fromPhoto, glassMaskDataUri, glassOutline } from '../../src/client/scene/geometry.ts';
 
 test('the photo keyboard knows the keys people type', () => {
   for (const code of ['KeyA', 'KeyZ', 'Digit1', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight', 'Space']) {
@@ -49,9 +49,9 @@ test('a patch lines the photo up behind the key', () => {
 });
 
 test('the glass mask is an even-odd hole where the glass is', () => {
-  const svg = decodeURIComponent(glassMaskDataUri().replace(/^url\("data:image\/svg\+xml,/, '').replace(/"\)$/, ''));
+  const svg = decodeURIComponent(glassMaskDataUri());
   assert.ok(svg.includes("fill-rule='evenodd'"));
-  assert.ok(svg.includes('M438 159'), svg);
+  assert.ok(svg.includes('M608 229'), svg);
   assert.ok(GLASS.rect.width > 0 && GLASS.rect.height > 0);
 });
 
@@ -63,7 +63,17 @@ test('the glass sits on the photo tube: x 416–608, y 152–306', () => {
   assert.deepEqual([x0, y0, x1, y1], [416, 152, 608, 306]);
 });
 
-test('the glass bulges like a tube: every edge curves outward through its midpoint', () => {
-  const svg = decodeURIComponent(glassMaskDataUri());
-  for (const control of ['Q512 145', 'Q614 229', 'Q512 313', 'Q410 229']) assert.ok(svg.includes(control), control);
+test('the glass is one smooth superellipse that touches the tube at its four midpoints', () => {
+  const pts = glassOutline();
+  const near = (x: number, y: number): boolean => pts.some((p) => Math.abs(p.x - x) < 0.01 && Math.abs(p.y - y) < 0.01);
+  for (const [x, y] of [[608, 229], [512, 152], [416, 229], [512, 306]]) assert.ok(near(x, y), `${x},${y}`);
+  for (const p of pts) {
+    const v = Math.abs((p.x - 512) / 96) ** 5 + Math.abs((p.y - 229) / 77) ** 5;
+    assert.ok(Math.abs(v - 1) < 1e-6, `${p.x},${p.y}`);
+  }
+  for (let i = 0; i < pts.length; i += 1) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 6, 'dense enough to look smooth');
+  }
 });
