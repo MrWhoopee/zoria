@@ -282,3 +282,19 @@ test('a broken inbox answer does not stop parts, news and repository from being 
   assert.equal(m.data().repository?.accessStatus, 'verified');
   assert.equal(m.data().lastError?.what, 'inbox');
 });
+
+test('a part that disappears from the list is dropped from the cache', async () => {
+  const routes = baseRoutes();
+  let listed = true;
+  let acknowledgedStages = 0;
+  routes['GET /stages'] = [() => ok({ items: listed ? [stageSummary()] : [] })];
+  routes['GET /me/summary'] = [() => summary({ acknowledgedStages })];
+  const { m } = room(routes);
+  await m.tick();
+  assert.ok(m.stage(SID));
+  listed = false;
+  acknowledgedStages = 1;
+  await m.tick();
+  assert.equal(m.stage(SID), null);
+  assert.equal(m.data().stages.length, 0);
+});

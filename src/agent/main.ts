@@ -156,7 +156,9 @@ const api = await startLocalApi({
     login: async () => {
       const ok = await session.login();
       mailroom.reset();
-      return ok ? { ok: true } : offline(401, session.lastError() ?? 'sign-in-failed');
+      if (ok) return { ok: true };
+      const f = session.lastFailure();
+      return offline(f?.status ?? 401, f?.code ?? 'sign-in-failed', (f?.retryAfter ?? 0) * 1000);
     },
     logout: async () => {
       await session.logout();

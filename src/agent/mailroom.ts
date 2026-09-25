@@ -242,6 +242,9 @@ export class Mailroom {
       if (!this.#live(gen)) return 'hard';
       this.#stages.set(stage.id, stage);
     }
+    if (!this.#live(gen)) return 'hard';
+    const listed = new Set(list.map((x) => x.id));
+    for (const id of [...this.#stages.keys()]) if (!listed.has(id)) this.#stages.delete(id);
     this.#put(gen, { stages: [...list].sort((a, b) => a.position - b.position) });
     return 'ok';
   }

@@ -78,3 +78,23 @@ test('pagination of a hostile 64 000 character part stays fast', () => {
   notebookPages([s], new Map([['a', full(s, 'x'.repeat(64_000))]]));
   assert.ok(performance.now() - started < 500, `${Math.round(performance.now() - started)} ms`);
 });
+
+test('a paragraph cut across pages keeps its bold text and links whole', () => {
+  const s = summary('a', 2);
+  const para = Array.from({ length: 400 }, (_, i) => (i % 50 === 7 ? '**bold words**' : i % 50 === 20 ? '[link](https://zoria.net/x)' : `w${i}`)).join(' ');
+  const pages = notebookPages([s], new Map([['a', full(s, para)]]));
+  const inline = pages.flatMap((p) => (p.kind === 'stage' ? p.blocks : [])).flatMap((b) => (b.t === 'para' ? b.inline : []));
+  assert.equal(inline.filter((x) => x.t === 'bold').length, 8);
+  assert.equal(inline.filter((x) => x.t === 'link').length, 8);
+  const text = inline.map((x) => x.s).join(' ');
+  assert.ok(!/w\d+ \d/.test(text), 'no word is broken by an inserted space');
+  for (const p of pages) assert.ok(rowsOf(p) <= PAGE_ROWS);
+});
+
+test('a single word longer than a page is cut by characters and never overflows', () => {
+  const s = summary('a', 2);
+  const pages = notebookPages([s], new Map([['a', full(s, 'x'.repeat(PAGE_COLS * PAGE_ROWS * 3))]]));
+  for (const p of pages) assert.ok(rowsOf(p) <= PAGE_ROWS, `${rowsOf(p)} rows`);
+  const total = pages.flatMap((p) => (p.kind === 'stage' ? p.blocks : [])).reduce((n, b) => n + (b.t === 'para' ? b.inline.map((x) => x.s).join('').length : 0), 0);
+  assert.equal(total, PAGE_COLS * PAGE_ROWS * 3);
+});

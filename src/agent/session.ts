@@ -3,6 +3,8 @@ import { backoffMs } from './backoff.ts';
 import { asGrant, errorCode } from './wire.ts';
 import type { StateBox } from './store.ts';
 
+export type SignInFailure = { status: number; code: string | null; retryAfter: number | null };
+
 export type SessionState = 'none' | 'active' | 'expired' | 'renewing' | 'logged-out' | 'rejected';
 
 export type SessionOptions = {
@@ -25,6 +27,7 @@ export class Session {
   #holdUntil = 0;
   #failures = 0;
   #lastError: string | null = null;
+  #lastFailure: SignInFailure | null = null;
 
   constructor(opts: SessionOptions) {
     this.#opts = { timeoutMs: 20_000, now: Date.now, rand: Math.random, renewBeforeMs: 600_000, ...opts };
@@ -43,6 +46,10 @@ export class Session {
 
   lastError(): string | null {
     return this.#lastError;
+  }
+
+  lastFailure(): SignInFailure | null {
+    return this.#lastFailure;
   }
 
   #fresh(): boolean {
@@ -116,7 +123,7 @@ export class Session {
       headers: JSON_HEADERS,
       body: JSON.stringify({ username: app.username, password: app.password }),
     }, this.#opts.timeoutMs, this.#opts.now);
-    if ('failed' in res) return this.#fail(res.failed);
+    if ('failed' in res) return this.#fail(res.failed, 0);
 
     const grant = asGrant(res.body);
     if (res.status === 200 && grant) {
@@ -127,12 +134,17 @@ export class Session {
       const expiresAt = Number.isFinite(Date.parse(grant.expiresAt))
         ? grant.expiresAt
         : new Date(this.#opts.now() + DAY_MS).toISOString();
-      await this.#opts.store.update((s) => ({
-        ...s,
-        registration: { ...s.registration, token: grant.token, sessionId: grant.sessionId, expiresAt },
-      }));
+      try {
+        await this.#opts.store.update((s) => ({
+          ...s,
+          registration: { ...s.registration, token: grant.token, sessionId: grant.sessionId, expiresAt },
+        }));
+      } catch {
+        return this.#fail('state-write', 0);
+      }
       this.#failures = 0;
       this.#lastError = null;
+      this.#lastFailure = null;
       return grant.token;
     }
 
@@ -140,19 +152,22 @@ export class Session {
     if (res.status === 401 && code === 'invalid-credentials') {
       this.#mode = 'rejected';
       this.#lastError = code;
+      this.#lastFailure = { status: 401, code, retryAfter: null };
       return null;
     }
     if (res.status === 429) {
       const seconds = res.retryAfterSeconds ?? (code === 'authentication-busy' ? 5 : 60);
       this.#holdUntil = this.#opts.now() + seconds * 1000;
       this.#lastError = code ?? 'rate-limited';
+      this.#lastFailure = { status: 429, code, retryAfter: seconds };
       return null;
     }
-    return this.#fail(code ?? `http-${res.status}`);
+    return this.#fail(code ?? `http-${res.status}`, res.status, code);
   }
 
-  #fail(reason: string): null {
+  #fail(reason: string, status: number, code: string | null = reason): null {
     this.#lastError = reason;
+    this.#lastFailure = { status, code, retryAfter: null };
     this.#retryAt = this.#opts.now() + backoffMs(this.#failures, this.#opts.rand);
     this.#failures += 1;
     return null;

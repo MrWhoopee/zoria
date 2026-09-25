@@ -1,4 +1,4 @@
-import { parseMarkdown, plainText, type Block } from '../text/markdown.ts';
+import { parseMarkdown, plainText, type Block, type Inline } from '../text/markdown.ts';
 import { wrap } from '../text/wrap.ts';
 import type { Stage, StageSummary } from '../../agent/account.ts';
 
@@ -36,15 +36,55 @@ function headerRows(title: string, errata: string | null, cols: number): number 
   return lines(title, cols) + 1 + STAMP_ROWS + (errata ? lines(errata, cols - 2) + 3 : 0);
 }
 
+function paragraphCut(inline: Inline[], take: number, cols: number): number | null {
+  const plain = plainText(inline, false);
+  if (take < 1 || wrap(plain, cols).length <= take) return null;
+  const links: Array<[number, number]> = [];
+  let pos = 0;
+  for (const x of inline) {
+    if (x.t === 'link') links.push([pos, pos + x.s.length]);
+    pos += x.s.length;
+  }
+  const ends = [...plain.matchAll(/\S+/g)].map((m) => (m.index ?? 0) + m[0].length);
+  let lo = 0;
+  let hi = ends.length - 1;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (wrap(plain.slice(0, ends[mid - 1]), cols).length <= take) lo = mid;
+    else hi = mid - 1;
+  }
+  const insideLink = (at: number): boolean => links.some(([a, b]) => a < at && at < b);
+  while (lo > 0 && insideLink(ends[lo - 1])) lo -= 1;
+  if (lo > 0) return ends[lo - 1];
+  const hard = take * cols;
+  return hard < plain.length && !insideLink(hard) ? hard : null;
+}
+
+function cutInline(inline: Inline[], at: number): [Inline[], Inline[]] {
+  const left: Inline[] = [];
+  const right: Inline[] = [];
+  let pos = 0;
+  for (const x of inline) {
+    const end = pos + x.s.length;
+    if (end <= at) left.push(x);
+    else if (pos >= at) right.push(x);
+    else {
+      left.push({ ...x, s: x.s.slice(0, at - pos) });
+      right.push({ ...x, s: x.s.slice(at - pos) });
+    }
+    pos = end;
+  }
+  while (right.length > 0 && right[0].s.trimStart() === '') right.shift();
+  if (right.length > 0) right[0] = { ...right[0], s: right[0].s.trimStart() };
+  return [left, right];
+}
+
 function split(b: Block, room: number, cols: number): [Block, Block] | null {
   if (b.t === 'para') {
-    const all = wrap(plainText(b.inline, false), cols);
-    const take = room - 1;
-    if (take < 1 || take >= all.length) return null;
-    return [
-      { t: 'para', inline: [{ t: 'text', s: all.slice(0, take).join(' ') }] },
-      { t: 'para', inline: [{ t: 'text', s: all.slice(take).join(' ') }] },
-    ];
+    const at = paragraphCut(b.inline, room - 1, cols);
+    if (at === null) return null;
+    const [left, right] = cutInline(b.inline, at);
+    return [{ t: 'para', inline: left }, { t: 'para', inline: right }];
   }
   if (b.t === 'list') {
     let used = 1;

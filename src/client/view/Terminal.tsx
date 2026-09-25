@@ -48,10 +48,11 @@ export function Terminal({ scene, snapshot, onShutdown, onStepBack }: Props) {
 
   useEffect(() => {
     if (crt === 'off') {
+      tickets.next();
       setInput('');
       setView(null);
     }
-  }, [crt]);
+  }, [crt, tickets]);
 
   useEffect(() => {
     if (!live) return;

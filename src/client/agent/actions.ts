@@ -1,12 +1,19 @@
 import { OFFLINE, readOutcome, type Outcome } from './outcome.ts';
 import type { Stage } from '../../agent/account.ts';
 
+const failure = (code: string): Outcome => ({ ok: false, ...OFFLINE, code });
+
 async function post(path: string, signal: AbortSignal): Promise<Outcome> {
+  let res: Response;
   try {
-    const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal });
+    res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal });
+  } catch {
+    return failure(signal.aborted ? 'cancelled' : 'agent-offline');
+  }
+  try {
     return readOutcome(await res.json() as unknown);
   } catch {
-    return { ok: false, ...OFFLINE };
+    return failure(signal.aborted ? 'cancelled' : 'bad-reply');
   }
 }
 

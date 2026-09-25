@@ -29,3 +29,8 @@ test('every line fits the 46-column screen', () => {
     for (const line of describeFailure(x)) assert.ok(Array.from(line).length <= 46, line);
   }
 });
+
+test('local reply problems are named as such, not as a lost server link', () => {
+  assert.equal(describeFailure(f(0, 'bad-reply'))[0], 'AGENT SENT A BROKEN REPLY');
+  assert.equal(describeFailure(f(0, 'cancelled'))[0], 'CANCELLED');
+});

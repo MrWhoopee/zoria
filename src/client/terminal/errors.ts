@@ -6,6 +6,8 @@ export function describeFailure(f: Failure): string[] {
   const req = f.status >= 500 && f.requestId ? [`REQ ${f.requestId}`] : [];
   if (f.code === 'no-session') return ['NOT SIGNED IN   type LOGIN'];
   if (f.code === 'agent-offline') return ['AGENT OFFLINE'];
+  if (f.code === 'bad-reply') return ['AGENT SENT A BROKEN REPLY'];
+  if (f.code === 'cancelled') return ['CANCELLED'];
   if (f.status === 0 && f.code === 'timeout') return ['SERVER TIMED OUT, retrying'];
   if (f.status === 0) return [withCode('NO LINK TO SERVER', f.code)];
   if (f.status === 503 && f.code === 'stopping') return ['PAUSED   server restarting', ...req];

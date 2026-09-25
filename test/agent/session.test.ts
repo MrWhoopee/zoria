@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fakeApi } from './fake-api.ts';
@@ -199,5 +199,30 @@ test('a grant without a readable expiry is treated as a day long, not as already
     assert.equal(await s.token(), T2);
     assert.equal(await s.token(), T2);
     assert.equal(api.hits.length, 1);
+  } finally { api.server.close(); }
+});
+
+test('a failed sign-in reports its real status and wait', async () => {
+  const api = await fakeApi({ '/auth/login': [() => ({ status: 429, body: JSON.stringify({ error: { code: 'authentication-busy' } }), retryAfter: 5 })] });
+  try {
+    const { box: b } = await box({ registered: true });
+    const s = new Session({ api: api.url, store: b, now: () => NOW });
+    assert.equal(await s.login(), false);
+    assert.deepEqual(s.lastFailure(), { status: 429, code: 'authentication-busy', retryAfter: 5 });
+  } finally { api.server.close(); }
+});
+
+test('a state file that cannot be written after sign-in backs off instead of signing in again at once', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'zoria-'));
+  await writeFile(join(dir, 'blocker'), 'file');
+  const api = await fakeApi({ '/auth/login': [() => grant(T2)] });
+  try {
+    const s0 = emptyState();
+    const b = new StateBox(join(dir, 'blocker', 'state.json'), { ...s0, application: APP, registration: { ...s0.registration, registered: true } });
+    const s = new Session({ api: api.url, store: b, now: () => NOW, rand: () => 1 });
+    assert.equal(await s.token(), null);
+    assert.equal(await s.token(), null);
+    assert.equal(api.hits.length, 1);
+    assert.equal(s.lastError(), 'state-write');
   } finally { api.server.close(); }
 });
