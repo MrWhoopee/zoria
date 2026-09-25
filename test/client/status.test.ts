@@ -121,3 +121,42 @@ test('a snapshot from an older agent without letter archive still renders', () =
   assert.deepEqual(parsed.ether.archive, []);
   assert.ok(statusLines(parsed, NOW, 'UTC').includes('LETTER   1/32'));
 });
+
+const ACCOUNT = {
+  session: { state: 'active' as const, expiresAt: '2026-09-27T05:00:00.000Z', username: 'mrwhoopee', displayName: 'MrWhoopee' },
+  summary: { unread: 2, releasedStages: 1, acknowledgedStages: 0, latestNews: null, repositoryAt: null, serverTime: null },
+  config: null,
+  repository: { url: 'https://github.com/mrwhoopee/zoria', accessStatus: 'verified', checkedAt: null, reason: null, reasonCode: null, updatedAt: null, verifiedElsewhere: false },
+  stages: [], inbox: [], news: [], lastError: null,
+};
+
+test('503 stopping says PAUSED, a jam says JAMMED', () => {
+  assert.ok(statusLines(snap({}, { silentUntil: NOW + 10_000, silentWhy: 'stop' }), NOW, 'UTC').includes('PAUSED   10s'));
+  assert.ok(statusLines(snap({}, { silentUntil: NOW + 10_000, silentWhy: 'jam' }), NOW, 'UTC').includes('JAMMED   10s'));
+});
+
+test('a registered agent shows the session end, new mail, parts and repository', () => {
+  const lines = statusLines(snap({ registrar: 'registered', account: ACCOUNT }), NOW, 'UTC');
+  assert.ok(lines.includes('SESSION  until 27.09 05:00 UTC'));
+  assert.ok(lines.includes('MAIL 2 NEW   PARTS 1   REPO VERIFIED'));
+  assert.ok(lines.length <= 10, 'fits the body of the screen');
+});
+
+test('logged out and rejected sessions point at LOGIN', () => {
+  const out = statusLines(snap({ account: { ...ACCOUNT, session: { ...ACCOUNT.session, state: 'logged-out' } } }), NOW, 'UTC');
+  assert.ok(out.includes('SESSION  logged out   type LOGIN'));
+  const rej = statusLines(snap({ account: { ...ACCOUNT, session: { ...ACCOUNT.session, state: 'rejected' } } }), NOW, 'UTC');
+  assert.ok(rej.includes('SESSION  REJECTED   type LOGIN'));
+});
+
+test('the last server error is shown with its request id', () => {
+  const lines = statusLines(snap({ account: { ...ACCOUNT, lastError: { what: 'news', status: 502, code: null, requestId: 'req-7' } } }), NOW, 'UTC');
+  assert.ok(lines.includes('ERROR    news: SERVER ERROR 502'));
+  assert.ok(lines.includes('REQ req-7'));
+});
+
+test('parseSnapshot keeps a snapshot whose account lists are missing', () => {
+  const s = parseSnapshot(JSON.stringify({ ...snap(), account: { session: ACCOUNT.session } }));
+  assert.deepEqual(s?.account?.inbox, []);
+  assert.deepEqual(s?.account?.stages, []);
+});
