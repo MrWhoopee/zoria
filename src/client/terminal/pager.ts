@@ -1,8 +1,8 @@
-import { COLS } from './grid.ts';
+import { COLS, ROWS } from './grid.ts';
 
 export type Scroll = { title: string; lines: string[]; top: number };
 
-export const PAGE_ROWS = 9;
+export const PAGE_ROWS = ROWS - 5;
 
 const maxTop = (s: Scroll, rows: number): number => Math.max(0, s.lines.length - rows);
 
@@ -36,4 +36,9 @@ export function scrollKey(key: string): number | 'start' | 'end' | null {
   if (key === 'Home') return 'start';
   if (key === 'End') return 'end';
   return null;
+}
+
+export function scrollHint(s: Scroll | null, rows = PAGE_ROWS): string {
+  if (s === null) return 'type HELP';
+  return maxTop(s, rows) > 0 ? '↑↓ PgUp PgDn scroll · Esc back' : 'Esc back';
 }

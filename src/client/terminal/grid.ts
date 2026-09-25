@@ -1,5 +1,5 @@
-export const COLS = 46;
-export const ROWS = 14;
+export const COLS = 54;
+export const ROWS = 21;
 
 export type ScreenParts = {
   header: string[];

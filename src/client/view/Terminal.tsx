@@ -5,7 +5,7 @@ import { COLS, composeScreen, splitAtColumn } from '../terminal/grid.ts';
 import { helpLines, parseCommand, type Command } from '../terminal/commands.ts';
 import { formatLocal, statusLines } from '../terminal/status.ts';
 import { letterLines } from '../terminal/letter.ts';
-import { openScroll, scrollBy, scrollKey, scrollTo, scrollView, type Scroll } from '../terminal/pager.ts';
+import { openScroll, scrollBy, scrollHint, scrollKey, scrollTo, scrollView, type Scroll } from '../terminal/pager.ts';
 import { mailList, mailText, newsList, newsText, numbered, partsList, repoLines, rollLines } from '../terminal/account.ts';
 import { describeFailure } from '../terminal/errors.ts';
 import { latest } from '../terminal/requests.ts';
@@ -19,7 +19,6 @@ type Props = { scene: SceneState; snapshot: Snapshot | null; onShutdown: () => v
 
 const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const BOOT = ['ZORIA.NET TERMINAL', '', 'LINK ........ OK', 'ETHER ....... LISTENING'];
-const HINT = 'type HELP';
 const pct = (n: number): string => `${n * 100}%`;
 const OFFLINE_LINES = ['AGENT OFFLINE', 'start the agent: npm run agent'];
 
@@ -159,7 +158,7 @@ export function Terminal({ scene, snapshot, onShutdown, onStepBack }: Props) {
     header: booting ? [] : [`ZORIA.NET  ${formatLocal(now, ZONE)} ${ZONE}`, ''],
     body,
     input: booting ? '' : input,
-    hint: booting ? '' : HINT,
+    hint: booting ? '' : scrollHint(view),
   });
 
   return (

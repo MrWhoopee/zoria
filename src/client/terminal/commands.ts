@@ -40,7 +40,6 @@ export function helpLines(): string[] {
     'LOGOUT    end the session',
     'SHUTDOWN  power off the terminal',
     '',
-    '↑ ↓ PgUp PgDn Home End  scroll',
-    'Esc  back;  Esc again  step back',
+    'Esc on STATUS  step back into the room',
   ];
 }

@@ -4,7 +4,8 @@ import { COLS, ROWS, composeScreen, fit, splitAtColumn } from '../../src/client/
 
 const width = (s: string): number => Array.from(s).length;
 
-test('the screen is exactly 14 rows of exactly 46 columns', () => {
+test('the screen is exactly 21 rows of exactly 54 columns', () => {
+  assert.deepEqual([ROWS, COLS], [21, 54]);
   const s = composeScreen({ header: ['A'], body: ['B'], input: 'C', hint: 'D' });
   assert.equal(s.lines.length, ROWS);
   for (const line of s.lines) assert.equal(width(line), COLS);
@@ -21,7 +22,7 @@ test('header comes first, body after it, input on the second-to-last row, hint o
 test('a body taller than the room left keeps its last lines', () => {
   const body = Array.from({ length: 30 }, (_, i) => `L${i}`);
   const s = composeScreen({ header: ['H'], body, input: '', hint: '' });
-  assert.equal(s.lines[1].trimEnd(), 'L19');
+  assert.equal(s.lines[1].trimEnd(), `L${30 - (ROWS - 3)}`);
   assert.equal(s.lines[ROWS - 3].trimEnd(), 'L29');
 });
 
