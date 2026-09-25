@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
-import { startLocalApi } from '../../src/agent/local-api.ts';
+import { accountRoute, startLocalApi, type AccountHandlers } from '../../src/agent/local-api.ts';
 import { initialEther } from '../../src/protocol/ether.ts';
 import type { Application } from '../../src/agent/store.ts';
 
@@ -233,5 +233,67 @@ test('a request for a foreign host name is refused, so DNS rebinding cannot reac
     assert.equal(await raw(api.port, '/state', 'GET', { host: 'evil.example' }), 403);
     assert.equal(await raw(api.port, '/state', 'GET', { host: `localhost:${api.port}` }), 200);
     assert.equal(called, false);
+  } finally { await api.close(); }
+});
+
+const SID = '00000000-0000-4000-8000-0000000000aa';
+
+function handlers(over: Partial<AccountHandlers> = {}): AccountHandlers {
+  return {
+    stage: (id) => (id === SID ? { id: SID, body: '# Part two' } : null),
+    ack: async () => ({ ok: true, stage: { id: SID } }),
+    read: async () => ({ ok: false, status: 503, code: 'stopping', requestId: 'r-1', retryAfter: 30 }),
+    login: async () => ({ ok: true }),
+    logout: async () => ({ ok: true }),
+    roll: async () => ({ ok: true, entries: [] }),
+    ...over,
+  };
+}
+
+test('account routes are recognised only with safe ids', () => {
+  assert.deepEqual(accountRoute('GET', `/account/stages/${SID}`), { kind: 'stage', id: SID });
+  assert.deepEqual(accountRoute('POST', `/account/stages/${SID}/ack`), { kind: 'ack', id: SID });
+  assert.deepEqual(accountRoute('POST', `/account/inbox/${SID}/read`), { kind: 'read', id: SID });
+  assert.deepEqual(accountRoute('POST', '/account/login'), { kind: 'login' });
+  assert.deepEqual(accountRoute('POST', '/account/logout'), { kind: 'logout' });
+  assert.deepEqual(accountRoute('POST', '/account/roll'), { kind: 'roll' });
+  assert.equal(accountRoute('GET', '/account/stages/..%2Fme'), null);
+  assert.equal(accountRoute('GET', '/account/stages/a/b'), null);
+  assert.equal(accountRoute('GET', '/account/login'), null);
+});
+
+test('GET /account/stages/:id returns the full text or 404', async () => {
+  const api = await startLocalApi({ port: 0, snapshot, onApplication: async () => {}, onInvitation: async () => {}, account: handlers() });
+  try {
+    const hit = await fetch(`http://127.0.0.1:${api.port}/account/stages/${SID}`);
+    assert.equal(hit.status, 200);
+    assert.equal(((await hit.json()) as { stage: { body: string } }).stage.body, '# Part two');
+    const miss = await fetch(`http://127.0.0.1:${api.port}/account/stages/00000000-0000-4000-8000-000000000000`);
+    assert.equal(miss.status, 404);
+  } finally { await api.close(); }
+});
+
+test('account actions answer 200 with the outcome, failures included', async () => {
+  const api = await startLocalApi({ port: 0, snapshot, onApplication: async () => {}, onInvitation: async () => {}, account: handlers() });
+  try {
+    const post = (path: string) => fetch(`http://127.0.0.1:${api.port}${path}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    });
+    const ack = await post(`/account/stages/${SID}/ack`);
+    assert.equal(ack.status, 200);
+    assert.equal(((await ack.json()) as { ok: boolean }).ok, true);
+    const read = await post(`/account/inbox/${SID}/read`);
+    assert.deepEqual(await read.json(), { ok: false, status: 503, code: 'stopping', requestId: 'r-1', retryAfter: 30 });
+  } finally { await api.close(); }
+});
+
+test('a request body over the limit is refused', async () => {
+  const api = await startLocalApi({ port: 0, snapshot, onApplication: async () => {}, onInvitation: async () => {} });
+  try {
+    const res = await fetch(`http://127.0.0.1:${api.port}/invitation`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ invitation: 'x'.repeat(70_000) }),
+    });
+    assert.equal(res.status, 400);
   } finally { await api.close(); }
 });

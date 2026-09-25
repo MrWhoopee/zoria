@@ -14,6 +14,7 @@ export default defineConfig({
       '/events': agent,
       '/application': agent,
       '/invitation': agent,
+      '/account': agent,
     },
   },
 });

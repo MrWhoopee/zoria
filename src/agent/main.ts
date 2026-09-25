@@ -2,7 +2,10 @@ import { loadConfig } from './config.ts';
 import { loadState, StateBox } from './store.ts';
 import { EtherLoop } from './ether-loop.ts';
 import { Registrar } from './registrar.ts';
-import { startLocalApi } from './local-api.ts';
+import { callReply, startLocalApi, type ActionReply } from './local-api.ts';
+import { Session } from './session.ts';
+import { makeCaller, fetchRepoAccess } from './server.ts';
+import { Mailroom } from './mailroom.ts';
 import { rememberEther, restoreEther, sameMemory } from './memory.ts';
 import { KeyRing, makeStationKey } from '../protocol/keyring.ts';
 import { fetchRaw } from './http.ts';
@@ -79,6 +82,20 @@ console.log('station key accepted, fingerprint verified');
 
 const store = new StateBox(config.statePath, await loadState(config.statePath));
 const registrar = new Registrar({ api: config.api, store, now: monotonicNow });
+const session = new Session({ api: config.api, store, timeoutMs: config.requestTimeoutMs });
+const call = makeCaller({ api: config.api, session, timeoutMs: config.requestTimeoutMs });
+const mailroom = new Mailroom({
+  call,
+  loadConfig: () => fetchRepoAccess(config.api, config.requestTimeoutMs),
+  ready: () => {
+    const s = session.state();
+    return s === 'active' || s === 'expired';
+  },
+  intervalMs: config.summaryIntervalMs,
+});
+
+const offline = (status: number, code: string, retryInMs = 0): ActionReply =>
+  ({ ok: false, status, code, requestId: null, retryAfter: Math.ceil(retryInMs / 1000) });
 
 const loop = new EtherLoop({
   api: config.api,
@@ -115,23 +132,60 @@ loop.onError((err) => {
 const api = await startLocalApi({
   port: config.localPort,
   clientDir: config.clientDir,
-  snapshot: () => ({
-    ether: loop.state(),
-    registrar: registrar.phase(),
-    blockedReason: registrar.blockedReason(),
-    serverNow: loop.state().lastFrameAt === null ? null : serverNow(loop.state(), monotonicNow()),
-    msUntilOpen: msUntilOpen(loop.state(), monotonicNow()),
-  }),
+  snapshot: () => {
+    const app = store.get().application;
+    return {
+      ether: loop.state(),
+      registrar: registrar.phase(),
+      blockedReason: registrar.blockedReason(),
+      serverNow: loop.state().lastFrameAt === null ? null : serverNow(loop.state(), monotonicNow()),
+      msUntilOpen: msUntilOpen(loop.state(), monotonicNow()),
+      account: {
+        session: {
+          state: session.state(), expiresAt: session.expiresAt(),
+          username: app?.username ?? null, displayName: app?.displayName ?? null,
+        },
+        ...mailroom.data(),
+      },
+    };
+  },
+  account: {
+    stage: (id) => mailroom.stage(id),
+    ack: async (id) => callReply(await mailroom.ack(id), { stage: mailroom.stage(id) }),
+    read: async (id) => {
+      const r = await mailroom.markRead(id);
+      return callReply(r, { message: mailroom.data().inbox.find((m) => m.id === id) ?? null });
+    },
+    login: async () => {
+      const ok = await session.login();
+      mailroom.reset();
+      return ok ? { ok: true } : offline(401, session.lastError() ?? 'sign-in-failed');
+    },
+    logout: async () => {
+      await session.logout();
+      mailroom.reset();
+      return { ok: true };
+    },
+    roll: async () => {
+      const r = await loop.roll();
+      if (r.ok) return { ok: true, entries: r.entries, at: new Date(r.at).toISOString() };
+      const status = r.reason === 'jammed' || r.reason === 'too-soon' || r.reason === 'silent' || r.reason === 'budget' ? 429
+        : r.reason === 'stopping' ? 503 : 0;
+      return offline(status, r.reason, r.retryInMs);
+    },
+  },
   onApplication: (a) => registrar.setApplication(a),
   onInvitation: (c) => registrar.setInvitation(c),
 });
 
 console.log(`agent listening on ${config.api}, open http://127.0.0.1:${api.port}`);
 loop.start();
+mailroom.start();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     loop.stop();
+    mailroom.stop();
     void api.close().then(() => process.exit(0));
   });
 }

@@ -4,6 +4,31 @@ import type { Application } from './store.ts';
 import type { RegistrarPhase } from './registrar.ts';
 import { isRepositoryRoot } from './repository-url.ts';
 import { readClientFile } from './static-files.ts';
+import type { AccountData } from './mailroom.ts';
+import type { SessionState } from './session.ts';
+import type { CallResult } from './server.ts';
+import { isId } from './account.ts';
+
+export type AccountView = AccountData & {
+  session: { state: SessionState; expiresAt: string | null; username: string | null; displayName: string | null };
+};
+
+export type ActionReply =
+  | ({ ok: true } & Record<string, unknown>)
+  | { ok: false; status: number; code: string | null; requestId: string | null; retryAfter: number | null };
+
+export type AccountHandlers = {
+  stage(id: string): unknown;
+  ack(id: string): Promise<ActionReply>;
+  read(id: string): Promise<ActionReply>;
+  login(): Promise<ActionReply>;
+  logout(): Promise<ActionReply>;
+  roll(): Promise<ActionReply>;
+};
+
+export type AccountRoute =
+  | { kind: 'stage' | 'ack' | 'read'; id: string }
+  | { kind: 'login' | 'logout' | 'roll' };
 
 export type Snapshot = {
   ether: EtherState;
@@ -11,6 +36,7 @@ export type Snapshot = {
   blockedReason: string | null;
   serverNow: number | null;
   msUntilOpen: number | null;
+  account?: AccountView;
 };
 
 export type LocalApiOptions = {
@@ -19,15 +45,46 @@ export type LocalApiOptions = {
   snapshot: () => Snapshot;
   onApplication: (a: Application) => Promise<void>;
   onInvitation: (code: string) => Promise<void>;
+  account?: AccountHandlers;
   pushMs?: number;
 };
 
+const MAX_BODY = 64 * 1024;
+
 function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (c) => { body += c; });
+    req.setEncoding('utf8');
+    const collect = (c: string): void => {
+      body += c;
+      if (body.length > MAX_BODY) {
+        req.off('data', collect);
+        req.resume();
+        reject(new Error('body too large'));
+      }
+    };
+    req.on('data', collect);
     req.on('end', () => resolve(body));
+    req.on('error', reject);
   });
+}
+
+export function callReply(r: CallResult, extra: Record<string, unknown>): ActionReply {
+  return r.ok
+    ? { ok: true, ...extra }
+    : { ok: false, status: r.status, code: r.code, requestId: r.requestId, retryAfter: r.retryAfter };
+}
+
+export function accountRoute(method: string, url: string): AccountRoute | null {
+  const parts = url.split('/');
+  if (parts[0] !== '' || parts[1] !== 'account') return null;
+  const [, , a, id, action] = parts;
+  if (method === 'GET' && a === 'stages' && isId(id) && parts.length === 4) return { kind: 'stage', id };
+  if (method !== 'POST') return null;
+  if (a === 'stages' && isId(id) && action === 'ack' && parts.length === 5) return { kind: 'ack', id };
+  if (a === 'inbox' && isId(id) && action === 'read' && parts.length === 5) return { kind: 'read', id };
+  if (parts.length === 3 && (a === 'login' || a === 'logout' || a === 'roll')) return { kind: a };
+  return null;
 }
 
 const USERNAME_RE = /^[a-z][a-z0-9_-]{2,31}$/;
@@ -99,6 +156,24 @@ export async function startLocalApi(opts: LocalApiOptions): Promise<{ port: numb
         }
         if (req.method === 'POST' && !(req.headers['content-type'] ?? '').startsWith('application/json')) {
           send(415, { error: 'content-type must be application/json' });
+          return;
+        }
+        const route = opts.account ? accountRoute(req.method ?? '', req.url ?? '') : null;
+        if (route && opts.account) {
+          const acc = opts.account;
+          if (route.kind === 'stage') {
+            const stage = acc.stage(route.id);
+            if (stage) send(200, { stage });
+            else send(404, { error: 'not found' });
+            return;
+          }
+          await readBody(req);
+          const reply = route.kind === 'ack' ? await acc.ack(route.id)
+            : route.kind === 'read' ? await acc.read(route.id)
+            : route.kind === 'login' ? await acc.login()
+            : route.kind === 'logout' ? await acc.logout()
+            : await acc.roll();
+          send(200, reply);
           return;
         }
         if (req.method === 'GET' && req.url === '/state') {

@@ -51,6 +51,28 @@ Never run the agent against the live server with the default state file while de
 
 `npm run encode:photo` re-encodes `assets-src/room-master.png` into `src/client/assets/room.webp`.
 
+## Session
+
+After registration the agent keeps the session itself: it signs in with the stored application when the token is missing, ends in less than ten minutes, or the server answers 401, and retries the request once. Wrong credentials stop automatic sign-in until `LOGIN`. `LOGOUT` ends the session on the server and wipes the token; a restart of the agent signs in again.
+
+The agent polls `/me/summary` every 15 seconds and rereads only what moved: letters, parts of the task, news, and the repository status.
+
+## Terminal commands
+
+| Command | What it shows |
+|---|---|
+| `STATUS` | ether, session, new mail, parts, repository |
+| `PARTS` / `ACK N` | released parts / acknowledge receipt of part N |
+| `MAIL` / `MAIL N` | letters / letter N in full (opening marks it read) |
+| `NEWS` / `NEWS N` | news / item N in full |
+| `REPO` | repository, who to invite, what to put in `.zoria`, access status |
+| `LETTER` | the keeper's letter |
+| `ROLL` | the roll call, your own line marked |
+| `LOGIN` / `LOGOUT` | sign in again / end the session |
+| `HELP` / `SHUTDOWN` | command list / power off |
+
+Long output scrolls with ↑ ↓, PgUp PgDn, Home End and the mouse wheel. Esc leaves the text, a second Esc steps back from the terminal into the room; click the screen or press Enter to come back. In the room, the notebook on the desk holds the full text of every part.
+
 ## Environment variables
 
 | Variable | Default | What it sets |
@@ -70,6 +92,12 @@ Listens only on `127.0.0.1`.
 | `GET /events` | the same snapshot as an SSE stream |
 | `POST /application` | stage an application |
 | `POST /invitation` | deliver the invitation code on the fly |
+| `GET /account/stages/:id` | the full text of a released part |
+| `POST /account/stages/:id/ack` | acknowledge receipt of a part |
+| `POST /account/inbox/:id/read` | mark a letter as read |
+| `POST /account/login` | sign in again with the stored application |
+| `POST /account/logout` | end the session on the server and stop automatic sign-in |
+| `POST /account/roll` | the sealed roll call, at most once a minute |
 
 The invitation code can be added at any moment, including in the middle of
 the window: the agent sends the staged application immediately, without
