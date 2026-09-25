@@ -14,6 +14,7 @@ export type RawResponse = {
   retryAfterSeconds: number | null;
   body: string;
   receivedAt: number;
+  requestId?: string | null;
 };
 
 const DEFAULT_JAM_MS = 60_000;

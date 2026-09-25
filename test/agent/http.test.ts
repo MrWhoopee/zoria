@@ -106,3 +106,16 @@ test('config strips trailing slash and reads stand from env', () => {
   assert.equal(c.api, 'https://stand.zoria.net/api/v1');
   assert.equal(c.etherIntervalMs, 15_000);
 });
+
+test('keeps the X-Request-Id header for failure reports', async () => {
+  const { url, server } = await listen((_req, res) => {
+    res.writeHead(500, { 'content-type': 'application/json', 'x-request-id': 'req-42' });
+    res.end('{"error":{"code":"internal-error","requestId":"req-42"}}');
+  });
+  try {
+    const r = await fetchRaw(`${url}/me/summary`, {}, 5000);
+    assert.ok(!('failed' in r));
+    if ('failed' in r) return;
+    assert.equal(r.requestId, 'req-42');
+  } finally { server.close(); }
+});

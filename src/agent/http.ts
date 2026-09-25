@@ -25,6 +25,7 @@ export async function fetchRaw(
       retryAfterSeconds: retryAfterSeconds(res.headers),
       body,
       receivedAt: now(),
+      requestId: res.headers.get('x-request-id'),
     };
   } catch (err) {
     const aborted = err instanceof Error && err.name === 'AbortError';
