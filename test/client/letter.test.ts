@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { letterScreen, wrap } from '../../src/client/terminal/letter.ts';
+import { letterScreen } from '../../src/client/terminal/letter.ts';
+import { wrap } from '../../src/client/text/wrap.ts';
 import { parseCommand, helpLines } from '../../src/client/terminal/commands.ts';
 import { COLS } from '../../src/client/terminal/grid.ts';
 
