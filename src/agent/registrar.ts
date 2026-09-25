@@ -1,5 +1,6 @@
 import { fetchRaw } from './http.ts';
-import { saveState, type AgentState, type Application } from './store.ts';
+import { asGrant, errorCode, type Grant } from './wire.ts';
+import type { AgentState, Application, StateBox } from './store.ts';
 import type { EtherState } from '../protocol/ether.ts';
 
 export type RegistrarPhase =
@@ -8,8 +9,7 @@ export type RegistrarPhase =
 
 export type RegistrarOptions = {
   api: string;
-  statePath: string;
-  state: AgentState;
+  store: StateBox;
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -17,32 +17,8 @@ export type RegistrarOptions = {
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
-function errorCode(body: string): string | null {
-  try {
-    const v = JSON.parse(body) as { error?: { code?: unknown } };
-    return typeof v.error?.code === 'string' ? v.error.code : null;
-  } catch {
-    return null;
-  }
-}
-
-type Session = { token: string; sessionId: string; expiresAt: string };
-
-function asSession(body: string): Session | null {
-  try {
-    const v = JSON.parse(body) as Partial<Session>;
-    if (typeof v.token === 'string' && /^[A-Za-z0-9_-]{43}$/.test(v.token)) {
-      return { token: v.token, sessionId: v.sessionId ?? '', expiresAt: v.expiresAt ?? '' };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 export class Registrar {
   readonly #opts: Required<RegistrarOptions>;
-  #state: AgentState;
   #phase: RegistrarPhase;
   #blockedReason: string | null = null;
   #busy = false;
@@ -55,13 +31,12 @@ export class Registrar {
       now: Date.now,
       ...opts,
     };
-    this.#state = opts.state;
     this.#phase = this.#derivePhase();
   }
 
   #derivePhase(): RegistrarPhase {
-    const { application, registration } = this.#state;
-    if (registration.token) return 'registered';
+    const { application, registration } = this.#opts.store.get();
+    if (registration.registered) return 'registered';
     if (registration.attemptedAt) return 'lost';
     if (!application) return 'no-application';
     if (!application.invitation) return 'no-invitation';
@@ -72,21 +47,20 @@ export class Registrar {
   blockedReason(): string | null { return this.#blockedReason; }
 
   async setApplication(app: Application): Promise<void> {
-    this.#state = { ...this.#state, application: app };
-    await saveState(this.#opts.statePath, this.#state);
+    await this.#opts.store.update((s) => ({ ...s, application: app }));
     if (this.#phase !== 'registered' && this.#phase !== 'lost') {
       this.#phase = this.#derivePhase();
     }
   }
 
   async remember(ether: AgentState['ether']): Promise<void> {
-    this.#state = { ...this.#state, ether };
-    await saveState(this.#opts.statePath, this.#state);
+    await this.#opts.store.update((s) => ({ ...s, ether }));
   }
 
   async setInvitation(code: string): Promise<void> {
-    if (!this.#state.application) throw new Error('application is not set');
-    await this.setApplication({ ...this.#state.application, invitation: code });
+    const app = this.#opts.store.get().application;
+    if (!app) throw new Error('application is not set');
+    await this.setApplication({ ...app, invitation: code });
     if (this.#lastWindowOpen) await this.onEther(this.#lastWindowOpen);
   }
 
@@ -111,12 +85,11 @@ export class Registrar {
   }
 
   async #persist(patch: Partial<AgentState['registration']>): Promise<void> {
-    this.#state = { ...this.#state, registration: { ...this.#state.registration, ...patch } };
-    await saveState(this.#opts.statePath, this.#state);
+    await this.#opts.store.update((s) => ({ ...s, registration: { ...s.registration, ...patch } }));
   }
 
   async #register(): Promise<void> {
-    const app = this.#state.application;
+    const app = this.#opts.store.get().application;
     if (!app || !app.invitation) { this.#phase = this.#derivePhase(); return; }
 
     this.#phase = 'registering';
@@ -134,9 +107,9 @@ export class Registrar {
 
       if ('failed' in res) { this.#phase = 'lost'; await this.#login(); return; }
 
-      const session = asSession(res.body);
+      const grant = asGrant(res.body);
       if (res.status >= 200 && res.status < 300) {
-        if (session) { await this.#accept(session); return; }
+        if (grant) { await this.#accept(grant); return; }
         this.#phase = 'lost';
         await this.#login();
         return;
@@ -164,7 +137,7 @@ export class Registrar {
   }
 
   async #login(): Promise<void> {
-    const app = this.#state.application;
+    const app = this.#opts.store.get().application;
     if (!app) { this.#phase = 'no-application'; return; }
 
     const res = await fetchRaw(`${this.#opts.api}/auth/login`, {
@@ -175,8 +148,8 @@ export class Registrar {
 
     if ('failed' in res) { this.#phase = 'lost'; return; }
 
-    const session = asSession(res.body);
-    if (res.status === 200 && session) { await this.#accept(session); return; }
+    const grant = asGrant(res.body);
+    if (res.status === 200 && grant) { await this.#accept(grant); return; }
 
     if (res.status === 401) {
       await this.#persist({ attemptedAt: null });
@@ -186,8 +159,8 @@ export class Registrar {
     this.#phase = 'lost';
   }
 
-  async #accept(s: Session): Promise<void> {
-    await this.#persist({ token: s.token, sessionId: s.sessionId, expiresAt: s.expiresAt });
+  async #accept(g: Grant): Promise<void> {
+    await this.#persist({ registered: true, token: g.token, sessionId: g.sessionId, expiresAt: g.expiresAt });
     this.#phase = 'registered';
   }
 }

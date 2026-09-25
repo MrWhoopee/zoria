@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { emptyState, loadState, saveState } from '../../src/agent/store.ts';
+import { StateBox, emptyState, loadState, saveState } from '../../src/agent/store.ts';
 
 async function tmpFile(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'zoria-'));
@@ -124,4 +124,43 @@ test('concurrent saves complete without corruption', async () => {
     saved.some((s) => JSON.stringify(s) === JSON.stringify(loaded)),
     'loaded state should match one of the saved states',
   );
+});
+
+test('a state saved before the registered flag existed counts as registered when it has a token', async () => {
+  const path = join(await mkdtemp(join(tmpdir(), 'zoria-')), 'state.json');
+  await writeFile(path, JSON.stringify({ registration: { attemptedAt: 'x', token: 't', sessionId: 's', expiresAt: 'e' } }));
+  assert.equal((await loadState(path)).registration.registered, true);
+});
+
+test('a state without a token and without the flag is not registered', async () => {
+  const path = join(await mkdtemp(join(tmpdir(), 'zoria-')), 'state.json');
+  await writeFile(path, JSON.stringify({ registration: { attemptedAt: 'x', token: null } }));
+  assert.equal((await loadState(path)).registration.registered, false);
+});
+
+test('an explicit registered flag survives a missing token', async () => {
+  const path = join(await mkdtemp(join(tmpdir(), 'zoria-')), 'state.json');
+  await writeFile(path, JSON.stringify({ registration: { registered: true, token: null } }));
+  assert.equal((await loadState(path)).registration.registered, true);
+});
+
+test('StateBox applies concurrent updates in order and loses none', async () => {
+  const path = join(await mkdtemp(join(tmpdir(), 'zoria-')), 'state.json');
+  const box = new StateBox(path, emptyState());
+  await Promise.all([
+    box.update((s) => ({ ...s, registration: { ...s.registration, token: 'tok' } })),
+    box.update((s) => ({ ...s, ether: { ...s.ether, fragmentsOf: 32 } })),
+  ]);
+  const saved = await loadState(path);
+  assert.equal(saved.registration.token, 'tok');
+  assert.equal(saved.ether.fragmentsOf, 32);
+  assert.equal(box.get().registration.token, 'tok');
+});
+
+test('a failed save leaves the in-memory state unchanged', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'zoria-'));
+  await writeFile(join(dir, 'blocker'), 'file');
+  const box = new StateBox(join(dir, 'blocker', 'state.json'), emptyState());
+  await assert.rejects(box.update((s) => ({ ...s, registration: { ...s.registration, token: 'tok' } })));
+  assert.equal(box.get().registration.token, null);
 });

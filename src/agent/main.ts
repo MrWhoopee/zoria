@@ -1,5 +1,5 @@
 import { loadConfig } from './config.ts';
-import { loadState } from './store.ts';
+import { loadState, StateBox } from './store.ts';
 import { EtherLoop } from './ether-loop.ts';
 import { Registrar } from './registrar.ts';
 import { startLocalApi } from './local-api.ts';
@@ -77,10 +77,8 @@ try {
 }
 console.log('station key accepted, fingerprint verified');
 
-const state = await loadState(config.statePath);
-const registrar = new Registrar({
-  api: config.api, statePath: config.statePath, state, now: monotonicNow,
-});
+const store = new StateBox(config.statePath, await loadState(config.statePath));
+const registrar = new Registrar({ api: config.api, store, now: monotonicNow });
 
 const loop = new EtherLoop({
   api: config.api,
@@ -90,10 +88,10 @@ const loop = new EtherLoop({
   capacity: 20,
   refillMs: 3000,
   now: monotonicNow,
-  initial: restoreEther(state.ether),
+  initial: restoreEther(store.get().ether),
 });
 
-let memory = state.ether;
+let memory = store.get().ether;
 
 loop.on((ether, obs) => {
   const mark = obs.t === 'signal' ? `signal ${obs.frame.phase}` : obs.t;

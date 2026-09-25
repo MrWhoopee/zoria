@@ -13,6 +13,7 @@ export type Application = {
 };
 
 export type Registration = {
+  registered: boolean;
   attemptedAt: string | null;
   token: string | null;
   sessionId: string | null;
@@ -30,7 +31,7 @@ const writeQueues = new Map<string, Promise<void>>();
 export function emptyState(): AgentState {
   return {
     application: null,
-    registration: { attemptedAt: null, token: null, sessionId: null, expiresAt: null },
+    registration: { registered: false, attemptedAt: null, token: null, sessionId: null, expiresAt: null },
     ether: emptyMemory(),
   };
 }
@@ -47,9 +48,13 @@ export async function loadState(path: string): Promise<AgentState> {
   try {
     const parsed = JSON.parse(raw) as Partial<AgentState> | null;
     const base = emptyState();
+    const registration = { ...base.registration, ...parsed?.registration };
+    if (typeof parsed?.registration?.registered !== 'boolean') {
+      registration.registered = typeof registration.token === 'string' && registration.token.length > 0;
+    }
     return {
       application: parsed?.application ?? base.application,
-      registration: { ...base.registration, ...parsed?.registration },
+      registration,
       ether: { ...base.ether, ...parsed?.ether },
     };
   } catch {
@@ -74,4 +79,29 @@ export async function saveState(path: string, state: AgentState): Promise<void> 
   });
   writeQueues.set(path, next.catch(() => {}));
   return next;
+}
+
+export class StateBox {
+  readonly #path: string;
+  #state: AgentState;
+  #queue: Promise<void> = Promise.resolve();
+
+  constructor(path: string, initial: AgentState) {
+    this.#path = path;
+    this.#state = initial;
+  }
+
+  get(): AgentState {
+    return this.#state;
+  }
+
+  update(fn: (s: AgentState) => AgentState): Promise<void> {
+    const run = this.#queue.then(async () => {
+      const next = fn(this.#state);
+      await saveState(this.#path, next);
+      this.#state = next;
+    });
+    this.#queue = run.then(() => undefined, () => undefined);
+    return run;
+  }
 }

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createServer, type Server } from 'node:http';
 import { Registrar } from '../../src/agent/registrar.ts';
-import { emptyState, loadState, type Application } from '../../src/agent/store.ts';
+import { StateBox, emptyState, loadState, type Application } from '../../src/agent/store.ts';
+import { fakeApi as api } from './fake-api.ts';
 import { initialEther, type EtherState } from '../../src/protocol/ether.ts';
 
 const APP: Application = {
@@ -20,34 +20,6 @@ const SESSION = {
   user: { username: 'north' },
 };
 
-type Route = (body: string) => { status: number; body: string; retryAfter?: number } | 'hang';
-
-async function api(routes: Record<string, Route[]>): Promise<{ url: string; server: Server; hits: string[] }> {
-  const hits: string[] = [];
-  const taken: Record<string, number> = {};
-  const server = createServer((req, res) => {
-    let body = '';
-    req.on('data', (c) => { body += c; });
-    req.on('end', () => {
-      const path = req.url ?? '';
-      hits.push(path);
-      const list = routes[path] ?? [];
-      const idx = Math.min(taken[path] ?? 0, list.length - 1);
-      taken[path] = (taken[path] ?? 0) + 1;
-      const out = list[idx]?.(body);
-      if (!out || out === 'hang') { req.socket.destroy(); return; }
-      const headers: Record<string, string> = { 'content-type': 'application/json' };
-      if (out.retryAfter !== undefined) headers['retry-after'] = String(out.retryAfter);
-      res.writeHead(out.status, headers);
-      res.end(out.body);
-    });
-  });
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
-  const addr = server.address();
-  const port = typeof addr === 'object' && addr ? addr.port : 0;
-  return { url: `http://127.0.0.1:${port}`, server, hits };
-}
-
 async function statePath(): Promise<string> {
   return join(await mkdtemp(join(tmpdir(), 'zoria-')), 'state.json');
 }
@@ -61,7 +33,7 @@ function instantSleep(): (ms: number) => Promise<void> {
 }
 
 test('with no application, the registrar does nothing', async () => {
-  const r = new Registrar({ api: 'http://unused', statePath: await statePath(), state: emptyState() });
+  const r = new Registrar({ api: 'http://unused', store: new StateBox(await statePath(), emptyState()) });
   assert.equal(r.phase(), 'no-application');
   await r.onEther(windowOpen());
   assert.equal(r.phase(), 'no-application');
@@ -70,7 +42,7 @@ test('with no application, the registrar does nothing', async () => {
 test('an application without a code is not sent even during an open window', async () => {
   const { url, server, hits } = await api({});
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication({ ...APP, invitation: '' });
     assert.equal(r.phase(), 'no-invitation');
     await r.onEther(windowOpen());
@@ -85,7 +57,7 @@ test('a code added mid-flight immediately triggers registration during an open w
   });
   try {
     const path = await statePath();
-    const r = new Registrar({ api: url, statePath: path, state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(path, emptyState()) });
     await r.setApplication({ ...APP, invitation: '' });
     await r.onEther(windowOpen());
     assert.equal(hits.length, 0);
@@ -100,7 +72,7 @@ test('a code added mid-flight immediately triggers registration during an open w
 test('a code arriving after the window has closed does not fire a doomed registration', async () => {
   const { url, server, hits } = await api({});
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication({ ...APP, invitation: '' });
     await r.onEther(windowOpen());
     await r.onEther({ ...initialEther(), phase: 'after' });
@@ -115,7 +87,7 @@ test('a code arriving after the window has closed does not fire a doomed registr
 test('during the noise phase the application is not sent', async () => {
   const { url, server, hits } = await api({});
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther({ ...initialEther(), phase: 'static' });
     assert.equal(hits.length, 0);
@@ -132,7 +104,7 @@ test('429 authentication-busy is not a refusal: it waits and retries', async () 
   });
   try {
     const r = new Registrar({
-      api: url, statePath: await statePath(), state: emptyState(), sleep: instantSleep(),
+      api: url, store: new StateBox(await statePath(), emptyState()), sleep: instantSleep(),
     });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
@@ -150,7 +122,7 @@ test('a generic 429 on register is also not a refusal: it waits and retries', as
   });
   try {
     const r = new Registrar({
-      api: url, statePath: await statePath(), state: emptyState(), sleep: instantSleep(),
+      api: url, store: new StateBox(await statePath(), emptyState()), sleep: instantSleep(),
     });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
@@ -166,7 +138,7 @@ test('a lost response logs in first and never creates a second account (CL-17)',
   });
   try {
     const path = await statePath();
-    const r = new Registrar({ api: url, statePath: path, state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(path, emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.deepEqual(hits, ['/auth/register', '/auth/login']);
@@ -179,7 +151,7 @@ test('the attempt marker is written to disk before the application is sent', asy
   const path = await statePath();
   const { url, server } = await api({ '/auth/register': [() => 'hang'], '/auth/login': [() => 'hang'] });
   try {
-    const r = new Registrar({ api: url, statePath: path, state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(path, emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     const saved = await loadState(path);
@@ -197,7 +169,7 @@ test('after a restart with an attempt marker on disk, it logs in rather than reg
     const prior = emptyState();
     prior.application = APP;
     prior.registration.attemptedAt = '2026-09-24T09:00:00.000Z';
-    const r = new Registrar({ api: url, statePath: await statePath(), state: prior });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), prior) });
     assert.equal(r.phase(), 'lost');
     await r.onEther(windowOpen());
     assert.deepEqual(hits, ['/auth/login'], 'no /auth/register call after a restart with a pending attempt');
@@ -211,7 +183,7 @@ test('409 username-unavailable also logs in first', async () => {
     '/auth/login': [() => ({ status: 200, body: JSON.stringify(SESSION) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.deepEqual(hits, ['/auth/register', '/auth/login']);
@@ -225,7 +197,7 @@ test('a 500 on register is treated like a dropped connection: it logs in instead
     '/auth/login': [() => ({ status: 200, body: JSON.stringify(SESSION) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.deepEqual(hits, ['/auth/register', '/auth/login']);
@@ -243,7 +215,7 @@ test('login 401 clears the attempt marker so a dropped registration is not stuck
     const prior = emptyState();
     prior.application = APP;
     prior.registration.attemptedAt = '2026-09-24T09:00:00.000Z';
-    const r = new Registrar({ api: url, statePath: path, state: prior });
+    const r = new Registrar({ api: url, store: new StateBox(path, prior) });
     assert.equal(r.phase(), 'lost');
 
     await r.onEther(windowOpen());
@@ -263,7 +235,7 @@ test('a 201 with a truncated body logs in instead of blocking a probably-created
     '/auth/login': [() => ({ status: 200, body: JSON.stringify(SESSION) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.deepEqual(hits, ['/auth/register', '/auth/login']);
@@ -276,7 +248,7 @@ test('a 200 instead of 201 with a valid session is accepted, not blocked', async
     '/auth/register': [() => ({ status: 200, body: JSON.stringify(SESSION) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.deepEqual(hits, ['/auth/register']);
@@ -289,7 +261,7 @@ test('422 invalid-invitation halts the machine and calls for a human', async () 
     '/auth/register': [() => ({ status: 422, body: JSON.stringify({ error: { code: 'invalid-invitation', field: 'invitation' } }) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.equal(r.phase(), 'blocked');
@@ -302,7 +274,7 @@ test('blocked is terminal: a rejected invitation does not keep burning the rate 
     '/auth/register': [() => ({ status: 422, body: JSON.stringify({ error: { code: 'invalid-invitation', field: 'invitation' } }) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.equal(r.phase(), 'blocked');
@@ -320,7 +292,7 @@ test('a jammed address during an open window sends nothing until the jam clears'
   try {
     let clock = 0;
     const r = new Registrar({
-      api: url, statePath: await statePath(), state: emptyState(), now: () => clock,
+      api: url, store: new StateBox(await statePath(), emptyState()), now: () => clock,
     });
     await r.setApplication(APP);
 
@@ -340,7 +312,7 @@ test('setApplication after registration does not re-derive phase and risk a seco
     '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.equal(r.phase(), 'registered');
@@ -356,7 +328,7 @@ test('setApplication after registration does not re-derive phase and risk a seco
 test('setApplication while lost does not re-derive phase and risk a second attempt', async () => {
   const { url, server, hits } = await api({ '/auth/register': [() => 'hang'], '/auth/login': [() => 'hang'] });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     assert.equal(r.phase(), 'lost');
@@ -372,7 +344,7 @@ test('after success there are no repeat registration requests', async () => {
     '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })],
   });
   try {
-    const r = new Registrar({ api: url, statePath: await statePath(), state: emptyState() });
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), emptyState()) });
     await r.setApplication(APP);
     await r.onEther(windowOpen());
     await r.onEther(windowOpen());
@@ -388,8 +360,8 @@ test('the letter it remembers and the registration it saves never overwrite each
   const path = await statePath();
   try {
     const r = new Registrar({
-      api: srv.url, statePath: path, sleep: instantSleep(),
-      state: { ...emptyState(), application: APP },
+      api: srv.url, sleep: instantSleep(),
+      store: new StateBox(path, { ...emptyState(), application: APP }),
     });
     const letter = { opensAt: null, closesAt: null, fragments: { 3: 'third' }, fragmentsOf: 32, archive: [] };
     const remembering = r.remember(letter);
@@ -401,4 +373,25 @@ test('the letter it remembers and the registration it saves never overwrite each
     assert.deepEqual(saved.ether.fragments, { 3: 'third', 4: 'fourth' });
     assert.equal(r.phase(), 'registered');
   } finally { srv.server.close(); }
+});
+test('after a logout the registrar still knows the account is registered and never registers again', async () => {
+  const { url, server, hits } = await api({});
+  try {
+    const prior = { ...emptyState(), application: APP };
+    prior.registration = { registered: true, attemptedAt: '2026-09-25T05:00:00.000Z', token: null, sessionId: null, expiresAt: null };
+    const r = new Registrar({ api: url, store: new StateBox(await statePath(), prior) });
+    assert.equal(r.phase(), 'registered');
+    await r.onEther(windowOpen());
+    assert.equal(hits.length, 0);
+  } finally { server.close(); }
+});
+
+test('a successful registration sets the registered flag on disk', async () => {
+  const { url, server } = await api({ '/auth/register': [() => ({ status: 201, body: JSON.stringify(SESSION) })] });
+  const path = await statePath();
+  try {
+    const r = new Registrar({ api: url, store: new StateBox(path, { ...emptyState(), application: APP }) });
+    await r.onEther(windowOpen());
+    assert.equal((await loadState(path)).registration.registered, true);
+  } finally { server.close(); }
 });
