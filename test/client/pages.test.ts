@@ -70,3 +70,11 @@ test('a code line wider than the page wraps onto the next rows instead of scroll
   const [c] = parseMarkdown(['```', 'x'.repeat(PAGE_COLS * 2 + 1), '', '```'].join('\n'));
   assert.equal(blockRows(c), 3 + 1 + 1);
 });
+
+test('pagination of a hostile 64 000 character part stays fast', () => {
+  const s = summary('a', 2);
+  const started = performance.now();
+  notebookPages([s], new Map([['a', full(s, '['.repeat(64_000))]]));
+  notebookPages([s], new Map([['a', full(s, 'x'.repeat(64_000))]]));
+  assert.ok(performance.now() - started < 500, `${Math.round(performance.now() - started)} ms`);
+});

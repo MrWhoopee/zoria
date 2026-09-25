@@ -156,3 +156,48 @@ test('renew of the current token signs in again', async () => {
     assert.equal(await s.renew(T1), T2);
   } finally { api.server.close(); }
 });
+
+test('a sign-in that finishes after LOGOUT is thrown away and revoked', async () => {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => { release = r; });
+  const api = await fakeApi({
+    '/auth/login': [async () => { await gate; return grant(T2); }],
+    '/auth/logout': [() => ({ status: 204, body: '' })],
+  });
+  try {
+    const { box: b, path } = await box({ registered: true });
+    const s = new Session({ api: api.url, store: b, now: () => NOW });
+    const pending = s.token();
+    await new Promise((r) => setTimeout(r, 30));
+    await s.logout();
+    release();
+    assert.equal(await pending, null);
+    assert.equal((await loadState(path)).registration.token, null);
+    assert.equal(s.state(), 'logged-out');
+    assert.ok(api.seen.some((x) => x.path === '/auth/logout' && x.auth === `Bearer ${T2}`), 'the late token is revoked');
+  } finally { api.server.close(); }
+});
+
+test('LOGIN respects a Retry-After the server asked for', async () => {
+  const api = await fakeApi({
+    '/auth/login': [() => ({ status: 429, body: JSON.stringify({ error: { code: 'rate-limited' } }), retryAfter: 60 }), () => grant(T2)],
+  });
+  try {
+    const { box: b } = await box({ registered: true });
+    const s = new Session({ api: api.url, store: b, now: () => NOW });
+    assert.equal(await s.token(), null);
+    assert.equal(await s.login(), false);
+    assert.equal(api.hits.length, 1);
+  } finally { api.server.close(); }
+});
+
+test('a grant without a readable expiry is treated as a day long, not as already expired', async () => {
+  const api = await fakeApi({ '/auth/login': [() => grant(T2, 'soon')] });
+  try {
+    const { box: b } = await box({ registered: true });
+    const s = new Session({ api: api.url, store: b, now: () => NOW });
+    assert.equal(await s.token(), T2);
+    assert.equal(await s.token(), T2);
+    assert.equal(api.hits.length, 1);
+  } finally { api.server.close(); }
+});

@@ -15,12 +15,14 @@ export type SessionOptions = {
 };
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
+const DAY_MS = 86_400_000;
 
 export class Session {
   readonly #opts: Required<SessionOptions>;
   #mode: 'auto' | 'logged-out' | 'rejected' = 'auto';
   #pending: Promise<string | null> | null = null;
   #retryAt = 0;
+  #holdUntil = 0;
   #failures = 0;
   #lastError: string | null = null;
 
@@ -72,6 +74,7 @@ export class Session {
     this.#mode = 'auto';
     this.#retryAt = 0;
     if (this.#fresh()) return true;
+    if (this.#opts.now() < this.#holdUntil) return false;
     return (await this.#signIn()) !== null;
   }
 
@@ -81,7 +84,10 @@ export class Session {
     await this.#opts.store.update((s) => ({
       ...s, registration: { ...s.registration, token: null, sessionId: null, expiresAt: null },
     }));
-    if (token === null) return;
+    if (token !== null) await this.#revoke(token);
+  }
+
+  async #revoke(token: string): Promise<void> {
     const res = await fetchRaw(`${this.#opts.api}/auth/logout`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, authorization: `Bearer ${token}` },
@@ -92,7 +98,8 @@ export class Session {
 
   #signIn(): Promise<string | null> {
     if (this.#pending) return this.#pending;
-    if (this.#opts.now() < this.#retryAt) return Promise.resolve(null);
+    const now = this.#opts.now();
+    if (now < this.#retryAt || now < this.#holdUntil) return Promise.resolve(null);
     const run = this.#requestSignIn().finally(() => { this.#pending = null; });
     this.#pending = run;
     return run;
@@ -113,9 +120,16 @@ export class Session {
 
     const grant = asGrant(res.body);
     if (res.status === 200 && grant) {
+      if (this.#mode !== 'auto') {
+        await this.#revoke(grant.token);
+        return null;
+      }
+      const expiresAt = Number.isFinite(Date.parse(grant.expiresAt))
+        ? grant.expiresAt
+        : new Date(this.#opts.now() + DAY_MS).toISOString();
       await this.#opts.store.update((s) => ({
         ...s,
-        registration: { ...s.registration, token: grant.token, sessionId: grant.sessionId, expiresAt: grant.expiresAt },
+        registration: { ...s.registration, token: grant.token, sessionId: grant.sessionId, expiresAt },
       }));
       this.#failures = 0;
       this.#lastError = null;
@@ -130,7 +144,7 @@ export class Session {
     }
     if (res.status === 429) {
       const seconds = res.retryAfterSeconds ?? (code === 'authentication-busy' ? 5 : 60);
-      this.#retryAt = this.#opts.now() + seconds * 1000;
+      this.#holdUntil = this.#opts.now() + seconds * 1000;
       this.#lastError = code ?? 'rate-limited';
       return null;
     }

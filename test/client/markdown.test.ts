@@ -68,3 +68,10 @@ test('a 64 000 character line parses quickly', () => {
   assert.equal(b.length, 1);
   assert.ok(performance.now() - started < 500);
 });
+
+test('a 64 000 character line of brackets parses quickly', () => {
+  const started = performance.now();
+  parseMarkdown('['.repeat(64_000));
+  parseMarkdown('[a'.repeat(32_000));
+  assert.ok(performance.now() - started < 300, `${Math.round(performance.now() - started)} ms`);
+});

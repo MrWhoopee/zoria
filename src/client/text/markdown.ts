@@ -14,7 +14,7 @@ const HEADING = /^(#{1,4})\s+(.*)$/;
 const BULLET = /^\s*[-*]\s+(.*)$/;
 const NUMBERED = /^\s*\d+\.\s+(.*)$/;
 const FENCE = /^\s*```/;
-const LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)/y;
+const LINK = /\[([^[\]\n]{1,1000})\]\(([^)\s]{1,2048})\)/y;
 
 export function safeHref(raw: string): string | null {
   try {

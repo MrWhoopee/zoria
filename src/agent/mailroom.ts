@@ -28,6 +28,8 @@ export type MailroomOptions = {
 };
 
 type Seen = { inbox?: number; stages?: string; news?: string | null; repo?: string | null };
+type Outcome = 'ok' | 'soft' | 'hard';
+type Scroll<T> = { outcome: Outcome; items: T[]; last: Summary };
 
 const PAGE = 100;
 const MAX_PAGES = 200;
@@ -50,6 +52,7 @@ export class Mailroom {
   #blockedUntil = 0;
   #failures = 0;
   #running: Promise<void> | null = null;
+  #generation = 0;
   #timer: NodeJS.Timeout | null = null;
 
   constructor(opts: MailroomOptions) {
@@ -65,6 +68,7 @@ export class Mailroom {
   stage(id: string): Stage | null { return this.#stages.get(id) ?? null; }
 
   reset(): void {
+    this.#generation += 1;
     this.#data = { ...emptyData(), config: this.#data.config };
     this.#stages.clear();
     this.#seen = {};
@@ -95,35 +99,62 @@ export class Mailroom {
 
   async #tick(): Promise<void> {
     if (!this.#opts.ready()) return;
-    await this.#refreshConfig();
+    const gen = this.#generation;
+    await this.#refreshConfig(gen);
     if (this.#opts.now() < this.#blockedUntil) return;
 
-    const summary = await this.#readSummary();
+    const summary = await this.#readSummary(gen);
     if (!summary) return;
-    this.#data = { ...this.#data, summary };
+    this.#put(gen, { summary });
 
-    const stagesKey = `${summary.releasedStages}:${summary.acknowledgedStages}:${summary.unread}`;
+    let clean = true;
+    const carryOn = (o: Outcome): boolean => {
+      if (o !== 'ok') clean = false;
+      return o !== 'hard';
+    };
+
     if (this.#seen.inbox !== summary.unread) {
-      if (!(await this.#readInbox(summary))) return;
-      this.#seen.inbox = summary.unread;
+      const r = await this.#readAll(gen, 'inbox', '/inbox', asMessage, summary, (x) => x.unread);
+      if (r.outcome === 'ok' && this.#live(gen)) {
+        this.#put(gen, { inbox: r.items });
+        this.#seen.inbox = r.last.unread;
+      }
+      if (!carryOn(r.outcome)) return;
     }
+    const stagesKey = `${summary.releasedStages}:${summary.acknowledgedStages}:${summary.unread}`;
     if (this.#seen.stages !== stagesKey) {
-      if (!(await this.#readStages())) return;
-      this.#seen.stages = stagesKey;
+      const o = await this.#readStages(gen);
+      if (o === 'ok' && this.#live(gen)) this.#seen.stages = stagesKey;
+      if (!carryOn(o)) return;
     }
     if (!('news' in this.#seen) || this.#seen.news !== summary.latestNews) {
-      if (!(await this.#readNews(summary))) return;
-      this.#seen.news = summary.latestNews;
+      const r = await this.#readAll(gen, 'news', '/news', asNews, summary, (x) => x.latestNews);
+      if (r.outcome === 'ok' && this.#live(gen)) {
+        this.#put(gen, { news: r.items });
+        this.#seen.news = r.last.latestNews;
+      }
+      if (!carryOn(r.outcome)) return;
     }
     if (!('repo' in this.#seen) || this.#seen.repo !== summary.repositoryAt) {
-      if (!(await this.#readRepository())) return;
-      this.#seen.repo = summary.repositoryAt;
+      const o = await this.#readRepository(gen);
+      if (o === 'ok' && this.#live(gen)) this.#seen.repo = summary.repositoryAt;
+      if (!carryOn(o)) return;
     }
-    this.#failures = 0;
-    this.#data = { ...this.#data, lastError: null };
+    if (clean && this.#live(gen)) {
+      this.#failures = 0;
+      this.#put(gen, { lastError: null });
+    }
   }
 
-  async #refreshConfig(): Promise<void> {
+  #live(gen: number): boolean {
+    return gen === this.#generation;
+  }
+
+  #put(gen: number, patch: Partial<AccountData>): void {
+    if (this.#live(gen)) this.#data = { ...this.#data, ...patch };
+  }
+
+  async #refreshConfig(gen: number): Promise<void> {
     if (this.#configLoaded || this.#opts.now() < this.#configRetryAt) return;
     const config = await this.#opts.loadConfig();
     if (config === undefined) {
@@ -131,102 +162,102 @@ export class Mailroom {
       return;
     }
     this.#configLoaded = true;
-    this.#data = { ...this.#data, config };
+    this.#put(gen, { config });
   }
 
-  #failed(what: string, r: CallError): false {
+  #failed(gen: number, what: string, r: CallError): Outcome {
+    if (!this.#live(gen)) return 'hard';
     this.#data = { ...this.#data, lastError: { what, status: r.status, code: r.code, requestId: r.requestId } };
     if (r.status === 429) {
       this.#blockedUntil = this.#opts.now() + (r.retryAfter ?? 60) * 1000;
-    } else if (r.status === 0 || r.status >= 500) {
+      return 'hard';
+    }
+    if (r.status === 0 || r.status >= 500) {
       this.#blockedUntil = this.#opts.now() + backoffMs(this.#failures, this.#opts.rand);
       this.#failures += 1;
+      return 'hard';
     }
-    return false;
+    return 'soft';
   }
 
-  #badBody(what: string, status: number): false {
-    return this.#failed(what, { ok: false, status, code: 'bad-body', requestId: null, retryAfter: null });
+  #badBody(gen: number, what: string, status: number): Outcome {
+    this.#failed(gen, what, { ok: false, status, code: 'bad-body', requestId: null, retryAfter: null });
+    return 'soft';
   }
 
-  async #readSummary(): Promise<Summary | null> {
+  async #readSummary(gen: number): Promise<Summary | null> {
     const r = await this.#opts.call('GET', '/me/summary');
-    if (!r.ok) { this.#failed('summary', r); return null; }
+    if (!r.ok) {
+      this.#failed(gen, 'summary', r);
+      return null;
+    }
     const s = asSummary(r.data);
-    if (!s) { this.#badBody('summary', r.status); return null; }
+    if (!s) this.#badBody(gen, 'summary', r.status);
     return s;
   }
 
   async #readAll<T extends { id: string }>(
-    what: string, path: string, item: (v: unknown) => T | null, moved: (s: Summary) => boolean,
-  ): Promise<T[] | null> {
+    gen: number, what: string, path: string, item: (v: unknown) => T | null,
+    start: Summary, watch: (s: Summary) => unknown,
+  ): Promise<Scroll<T>> {
+    let before = start;
     for (let attempt = 0; ; attempt += 1) {
       const byId = new Map<string, T>();
       let offset: number | null = 0;
       for (let page = 0; offset !== null && page < MAX_PAGES; page += 1) {
         const r = await this.#opts.call('GET', `${path}?limit=${PAGE}&offset=${offset}`);
-        if (!r.ok) return this.#failed(what, r) || null;
+        if (!r.ok) return { outcome: this.#failed(gen, what, r), items: [], last: before };
         const p = asPage(r.data, item);
-        if (!p) return this.#badBody(what, r.status) || null;
+        if (!p) return { outcome: this.#badBody(gen, what, r.status), items: [], last: before };
         for (const x of p.items) if (!byId.has(x.id)) byId.set(x.id, x);
         offset = p.nextOffset !== null && p.nextOffset > offset ? p.nextOffset : null;
       }
-      if (attempt === MAX_RESTARTS) return [...byId.values()];
-      const now = await this.#readSummary();
-      if (!now) return null;
-      this.#data = { ...this.#data, summary: now };
-      if (!moved(now)) return [...byId.values()];
+      if (attempt === MAX_RESTARTS) return { outcome: 'ok', items: [...byId.values()], last: before };
+      const now = await this.#readSummary(gen);
+      if (!now) return { outcome: 'hard', items: [], last: before };
+      this.#put(gen, { summary: now });
+      if (watch(now) === watch(before)) return { outcome: 'ok', items: [...byId.values()], last: now };
+      before = now;
     }
   }
 
-  async #readInbox(start: Summary): Promise<boolean> {
-    const items = await this.#readAll('inbox', '/inbox', asMessage, (s) => s.unread !== start.unread);
-    if (!items) return false;
-    this.#data = { ...this.#data, inbox: items };
-    return true;
-  }
-
-  async #readNews(start: Summary): Promise<boolean> {
-    const items = await this.#readAll('news', '/news', asNews, (s) => s.latestNews !== start.latestNews);
-    if (!items) return false;
-    this.#data = { ...this.#data, news: items };
-    return true;
-  }
-
-  async #readStages(): Promise<boolean> {
+  async #readStages(gen: number): Promise<Outcome> {
     const r = await this.#opts.call('GET', '/stages');
-    if (!r.ok) return this.#failed('stages', r);
+    if (!r.ok) return this.#failed(gen, 'stages', r);
     const list = asStageList(r.data);
-    if (!list) return this.#badBody('stages', r.status);
+    if (!list) return this.#badBody(gen, 'stages', r.status);
     for (const s of list) {
       const cached = this.#stages.get(s.id);
       if (cached && cached.errataAt === s.errataAt) {
-        if (cached.acknowledgedAt !== s.acknowledgedAt) this.#stages.set(s.id, { ...cached, acknowledgedAt: s.acknowledgedAt });
+        if (cached.acknowledgedAt !== s.acknowledgedAt && this.#live(gen)) {
+          this.#stages.set(s.id, { ...cached, acknowledgedAt: s.acknowledgedAt });
+        }
         continue;
       }
       const full = await this.#opts.call('GET', `/stages/${s.id}`);
       if (!full.ok && full.status === 404) continue;
-      if (!full.ok) return this.#failed('stage', full);
+      if (!full.ok) return this.#failed(gen, 'stage', full);
       const stage = asStage(field(full.data, 'stage'));
-      if (!stage) return this.#badBody('stage', full.status);
+      if (!stage) return this.#badBody(gen, 'stage', full.status);
+      if (!this.#live(gen)) return 'hard';
       this.#stages.set(stage.id, stage);
     }
-    this.#data = { ...this.#data, stages: [...list].sort((a, b) => a.position - b.position) };
-    return true;
+    this.#put(gen, { stages: [...list].sort((a, b) => a.position - b.position) });
+    return 'ok';
   }
 
-  async #readRepository(): Promise<boolean> {
+  async #readRepository(gen: number): Promise<Outcome> {
     const r = await this.#opts.call('GET', '/me/repository');
-    if (!r.ok) return this.#failed('repository', r);
+    if (!r.ok) return this.#failed(gen, 'repository', r);
     const raw = field(r.data, 'repository');
     if (raw === null) {
-      this.#data = { ...this.#data, repository: null };
-      return true;
+      this.#put(gen, { repository: null });
+      return 'ok';
     }
     const repository = asRepository(raw);
-    if (!repository) return this.#badBody('repository', r.status);
-    this.#data = { ...this.#data, repository };
-    return true;
+    if (!repository) return this.#badBody(gen, 'repository', r.status);
+    this.#put(gen, { repository });
+    return 'ok';
   }
 
   async ack(id: string): Promise<CallResult> {

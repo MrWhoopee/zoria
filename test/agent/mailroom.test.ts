@@ -239,3 +239,46 @@ test('reset forgets everything read so the next tick reads it all again', async 
   await m.tick();
   assert.ok(log.includes('GET /inbox?limit=100&offset=0'));
 });
+
+test('one letter arriving mid-scroll costs one extra scroll, not four', async () => {
+  const routes = baseRoutes();
+  let unread = 1;
+  let scrolls = 0;
+  routes['GET /inbox?limit=100&offset=0'] = [() => { scrolls += 1; if (scrolls === 1) unread = 2; return ok({ items: [msg(ID1)], nextOffset: null }); }];
+  routes['GET /me/summary'] = [() => summary({ unread })];
+  const { m } = room(routes);
+  await m.tick();
+  assert.equal(scrolls, 2);
+  await m.tick();
+  assert.equal(scrolls, 2, 'the next tick sees nothing new');
+});
+
+test('a reset during a running tick keeps the old account out of the data', async () => {
+  const routes = baseRoutes();
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => { release = r; });
+  const f = fakeCall(routes);
+  const m = new Mailroom({
+    call: async (method, path) => { if (path === '/me/repository') await gate; return f.call(method, path); },
+    loadConfig: async () => null, ready: () => true, intervalMs: 15_000, now: () => 0, rand: () => 1,
+  });
+  const running = m.tick();
+  await new Promise((r) => setTimeout(r, 20));
+  m.reset();
+  release();
+  await running;
+  assert.equal(m.data().inbox.length, 0);
+  assert.equal(m.data().repository, null);
+  assert.equal(m.stage(SID), null);
+});
+
+test('a broken inbox answer does not stop parts, news and repository from being read', async () => {
+  const routes = baseRoutes();
+  routes['GET /inbox?limit=100&offset=0'] = [() => ok('<html>')];
+  const { m } = room(routes);
+  await m.tick();
+  assert.equal(m.data().stages.length, 1);
+  assert.equal(m.data().news.length, 1);
+  assert.equal(m.data().repository?.accessStatus, 'verified');
+  assert.equal(m.data().lastError?.what, 'inbox');
+});

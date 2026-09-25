@@ -123,8 +123,9 @@ function PageView({ page, zone, onJump }: { page: Page | undefined; zone: string
 export function Notebook({ scene, stages, zone, reducedMotion, onClose, onTurn }: Props) {
   const shown = notebookShown(scene);
   const texts = useStageTexts(stages, shown);
-  const pages = useMemo(() => notebookPages(stages, texts), [stages, texts]);
-  const spreads = pages.length / 2;
+  const stagesKey = stages.map((x) => `${x.id}:${x.position}:${x.title}:${x.releasedAt ?? ''}:${x.acknowledgedAt ?? ''}:${x.errataAt ?? ''}`).join('|');
+  const pages = useMemo(() => (shown ? notebookPages(stages, texts) : []), [stagesKey, texts, shown]);
+  const spreads = Math.max(1, pages.length / 2);
   const [spread, setSpread] = useState(0);
   const [turn, setTurn] = useState<'next' | 'prev' | null>(null);
   const current = Math.min(spread, spreads - 1);
