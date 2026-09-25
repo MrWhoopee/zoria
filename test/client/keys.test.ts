@@ -51,6 +51,14 @@ test('a patch lines the photo up behind the key', () => {
 test('the glass mask is an even-odd hole where the glass is', () => {
   const svg = decodeURIComponent(glassMaskDataUri().replace(/^url\("data:image\/svg\+xml,/, '').replace(/"\)$/, ''));
   assert.ok(svg.includes("fill-rule='evenodd'"));
-  assert.ok(svg.includes('M430 143'), svg);
+  assert.ok(svg.includes('M438 152'), svg);
   assert.ok(GLASS.rect.width > 0 && GLASS.rect.height > 0);
+});
+
+test('the glass sits on the photo tube: x 416–608, y 152–306', () => {
+  const x0 = Math.round(GLASS.rect.left * 1024);
+  const y0 = Math.round(GLASS.rect.top * 572);
+  const x1 = Math.round((GLASS.rect.left + GLASS.rect.width) * 1024);
+  const y1 = Math.round((GLASS.rect.top + GLASS.rect.height) * 572);
+  assert.deepEqual([x0, y0, x1, y1], [416, 152, 608, 306]);
 });

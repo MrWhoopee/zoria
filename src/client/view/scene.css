@@ -11,7 +11,7 @@ html, body, #root { margin: 0; height: 100%; background: #000; overflow: hidden;
 .terminal { z-index: 1; box-sizing: border-box; overflow: hidden; }
 .terminal .glass { position: absolute; inset: 0; background: radial-gradient(ellipse at 42% 32%, #7d868b 0%, #4a5156 42%, #2a2f33 100%); }
 .terminal .glass::before { content: ""; position: absolute; left: 14%; top: 12%; width: 40%; height: 22%; border-radius: 50%; background: radial-gradient(ellipse, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 70%); transform: rotate(-12deg); }
-.terminal .screen { position: absolute; inset: 0; box-sizing: border-box; padding: 1.9cqw 1.8cqw; font: .528cqw/1.3 "Courier New", ui-monospace, monospace; color: #0d2a36; white-space: pre; background: radial-gradient(ellipse at 50% 42%, #eafcff 0%, #bde8f5 46%, #86bccf 100%); opacity: 0; transition: opacity .35s; }
+.terminal .screen { position: absolute; inset: 0; box-sizing: border-box; padding: 1.24cqw 1.42cqw; font: .528cqw/1.3 "Courier New", ui-monospace, monospace; color: #0d2a36; white-space: pre; background: radial-gradient(ellipse at 50% 42%, #eafcff 0%, #bde8f5 46%, #86bccf 100%); opacity: 0; transition: opacity .35s; }
 .terminal .screen::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(10, 40, 55, .13) 0 1px, transparent 1px 3px); }
 .terminal[data-crt="booting"] .screen { opacity: 1; transition-delay: .35s; }
 .terminal[data-crt="on"] .screen { opacity: 1; animation: crt-flicker 3.4s infinite steps(1); }
