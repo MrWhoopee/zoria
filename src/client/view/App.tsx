@@ -38,6 +38,7 @@ export function App() {
     dispatch({ type: 'press' });
   }, [audio]);
   const onShutdown = useCallback(() => dispatch({ type: 'shutdown' }), []);
+  const onStepBack = useCallback(() => undefined, []);
   const onFlicker = useCallback((e: FlickerEvent) => audio.flicker(e), [audio]);
   const onKey = useCallback((code: string) => audio.key(code), [audio]);
 
@@ -48,6 +49,7 @@ export function App() {
       reducedMotion={reducedMotion}
       onPress={onPress}
       onShutdown={onShutdown}
+      onStepBack={onStepBack}
       onFlicker={onFlicker}
       onKey={onKey}
     />

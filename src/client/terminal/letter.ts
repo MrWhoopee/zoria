@@ -4,8 +4,6 @@ import type { Letter } from '../../protocol/ether.ts';
 
 export type LetterSource = { fragments: Record<number, string>; fragmentsOf: number | null; archive: Letter[] };
 
-const PAGE_SIZE = 8;
-
 function fragmentBlocks(fragments: Record<number, string>, of: number, cols: number): string[][] {
   const width = Math.max(2, String(of).length);
   const indent = ' '.repeat(width + 1);
@@ -22,26 +20,9 @@ function fragmentBlocks(fragments: Record<number, string>, of: number, cols: num
   return blocks;
 }
 
-function paginate(blocks: string[][], size: number): string[][] {
-  const pages: string[][] = [[]];
-  for (const block of blocks) {
-    const page = pages[pages.length - 1];
-    if (page.length > 0 && page.length + block.length > size) pages.push([...block.slice(0, size)]);
-    else page.push(...block.slice(0, size - page.length));
-  }
-  return pages;
-}
-
-export function letterScreen(letter: LetterSource, page: number, cols = COLS): string[] {
-  if (letter.fragmentsOf === null) {
-    return ['LETTER   NONE YET', 'fragments arrive with genuine frames'];
-  }
-  const pageList = paginate(fragmentBlocks(letter.fragments, letter.fragmentsOf, cols), PAGE_SIZE);
-  const pages = pageList.length;
-  const current = Math.min(Math.max(1, page), pages);
-  const have = Object.keys(letter.fragments).length;
-  const screen = [`LETTER   ${have}/${letter.fragmentsOf}   PAGE ${current}/${pages}`, ...pageList[current - 1]];
-  if (current < pages) screen.push(`type LETTER ${current + 1}`);
-  else if (letter.archive.length > 0) screen.push(`EARLIER LETTERS KEPT: ${letter.archive.length}`);
-  return screen;
+export function letterLines(letter: LetterSource, cols = COLS): string[] {
+  if (letter.fragmentsOf === null) return ['NONE YET', 'fragments arrive with genuine frames'];
+  const lines = fragmentBlocks(letter.fragments, letter.fragmentsOf, cols).flat();
+  if (letter.archive.length > 0) lines.push('', `EARLIER LETTERS KEPT: ${letter.archive.length}`);
+  return lines;
 }

@@ -18,11 +18,12 @@ export type StageProps = {
   reducedMotion: boolean;
   onPress: () => void;
   onShutdown: () => void;
+  onStepBack: () => void;
   onFlicker?: (e: FlickerEvent) => void;
   onKey?: (code: string) => void;
 };
 
-export function Stage({ scene, snapshot, reducedMotion, onPress, onShutdown, onFlicker, onKey }: StageProps) {
+export function Stage({ scene, snapshot, reducedMotion, onPress, onShutdown, onStepBack, onFlicker, onKey }: StageProps) {
   const classes = ['stage', isLit(scene) && 'lit', isZoomed(scene) && 'zoomed'].filter(Boolean).join(' ');
   const world = {
     transformOrigin: `${ZOOM.origin.x * 100}% ${ZOOM.origin.y * 100}%`,
@@ -32,7 +33,7 @@ export function Stage({ scene, snapshot, reducedMotion, onPress, onShutdown, onF
   return (
     <div className={classes} data-zaria={A.scene} data-scene={scene}>
       <div className="world" style={world}>
-        <Terminal scene={scene} snapshot={snapshot} onShutdown={onShutdown} />
+        <Terminal scene={scene} snapshot={snapshot} onShutdown={onShutdown} onStepBack={onStepBack} />
         <Photo />
         <Lights lit={isLit(scene)} jammed={jammed} reducedMotion={reducedMotion} onFlicker={onFlicker} />
         <Keyboard active={acceptsInput(scene)} onKey={onKey} />

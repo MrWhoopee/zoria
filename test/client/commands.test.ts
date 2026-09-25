@@ -28,3 +28,12 @@ test('help lists every command and fits the 46-column screen', () => {
   }
   for (const l of lines) assert.ok(Array.from(l).length <= 46);
 });
+
+test('account commands take an optional positive number', () => {
+  assert.deepEqual(parseCommand('mail'), { kind: 'mail', n: null });
+  assert.deepEqual(parseCommand('MAIL 3'), { kind: 'mail', n: 3 });
+  assert.deepEqual(parseCommand('news 0'), { kind: 'news', n: null });
+  assert.deepEqual(parseCommand('ack 2'), { kind: 'ack', n: 2 });
+  assert.deepEqual(parseCommand('ack x'), { kind: 'ack', n: null });
+  for (const w of ['parts', 'repo', 'roll', 'login', 'logout', 'letter']) assert.equal(parseCommand(w).kind, w);
+});
