@@ -29,6 +29,12 @@ html, body, #root { margin: 0; height: 100%; background: #000; overflow: hidden;
 .power-button:disabled { cursor: default; }
 .power-button:focus-visible { outline: 2px solid #ffb35c; outline-offset: 2px; opacity: 1; }
 
+.hotspot { z-index: 8; border: 0; padding: 0; background: transparent; cursor: pointer; border-radius: 1cqw; transition: box-shadow .25s; }
+.hotspot:hover, .hotspot:focus-visible, .power-button.hotspot-round:hover, .power-button.hotspot-round:focus-visible { outline: none; box-shadow: 0 0 0 .18cqw rgba(255, 190, 110, .85), 0 0 1.4cqw .3cqw rgba(255, 170, 70, .45); }
+.power-button.hotspot-round { opacity: 1; background: transparent; }
+.hint { position: absolute; left: 0; right: 0; bottom: 1.4cqw; z-index: 20; text-align: center; font: .95cqw/1.4 "Courier New", ui-monospace, monospace; letter-spacing: .06em; color: rgba(255, 226, 180, .82); text-shadow: 0 0 .5cqw rgba(0, 0, 0, .9); opacity: 0; transition: opacity .6s; pointer-events: none; }
+.hint.shown { opacity: 1; }
+
 @keyframes pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes crt-flicker { 0%, 100% { filter: brightness(1); } 47% { filter: brightness(.94); } 48% { filter: brightness(1.04); } 73% { filter: brightness(.97); } }
@@ -39,6 +45,7 @@ html, body, #root { margin: 0; height: 100%; background: #000; overflow: hidden;
   .world, .terminal .screen { transition: none; }
   .terminal .beam, .terminal[data-crt="on"] .screen, .cursor, .power-button.armed { animation: none; }
   .power-button.armed { opacity: 1; }
+  .hint, .hotspot { transition: none; }
 }
 
 .lights, .lights .lamp { position: absolute; inset: 0; pointer-events: none; z-index: 4; }

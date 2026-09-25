@@ -35,10 +35,21 @@ export function App() {
   const onPress = useCallback(() => {
     audio.unlock();
     audio.play('relay');
-    dispatch({ type: 'press' });
-  }, [audio]);
+    dispatch({ type: scene === 'room' ? 'shutdown' : 'press' });
+  }, [audio, scene]);
   const onShutdown = useCallback(() => dispatch({ type: 'shutdown' }), []);
-  const onStepBack = useCallback(() => undefined, []);
+  const onStepBack = useCallback(() => dispatch({ type: 'stepBack' }), []);
+  const onApproach = useCallback(() => dispatch({ type: 'approach' }), []);
+  const onOpenNotebook = useCallback(() => dispatch({ type: 'openNotebook' }), []);
+
+  useEffect(() => {
+    if (scene !== 'room') return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Enter') { e.preventDefault(); dispatch({ type: 'approach' }); }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [scene]);
   const onFlicker = useCallback((e: FlickerEvent) => audio.flicker(e), [audio]);
   const onKey = useCallback((code: string) => audio.key(code), [audio]);
 
@@ -50,6 +61,8 @@ export function App() {
       onPress={onPress}
       onShutdown={onShutdown}
       onStepBack={onStepBack}
+      onApproach={onApproach}
+      onOpenNotebook={onOpenNotebook}
       onFlicker={onFlicker}
       onKey={onKey}
     />

@@ -18,6 +18,7 @@ const glow = (x: number, y: number, w: number, h: number): Glow =>
 export const GLASS = { rect: box(414, 143, 619, 311), radius: 16 / PW };
 export const SCREEN = box(406, 135, 627, 319);
 export const ZOOM = { origin: fromPhoto(514, 270), scale: 1.75 };
+export const NOTEBOOK = box(800, 503, 972, 572);
 export const POWER_BUTTON = { center: fromPhoto(512, 490), radius: 24 / PW };
 export const JAM_LED = glow(685, 185, 24, 24);
 

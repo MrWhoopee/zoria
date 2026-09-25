@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  acceptsInput, crtPhase, isLit, isZoomed, reduceScene, stepDuration,
+  acceptsInput, crtPhase, inRoom, isLit, isZoomed, notebookShown, reduceScene, stepDuration,
   type SceneEvent, type SceneState,
 } from '../../src/client/scene/machine.ts';
 
@@ -69,5 +69,39 @@ test('flags follow the sequence', () => {
     assert.equal(isZoomed(s), zoomed, `zoomed ${s}`);
     assert.equal(acceptsInput(s), input, `input ${s}`);
     assert.equal(crtPhase(s), crt, `crt ${s}`);
+  }
+});
+
+test('Esc steps back into the room, a click or Enter comes back to work', () => {
+  assert.deepEqual(run('working', ['stepBack', 'stepDone']), ['stepBack', 'room']);
+  assert.deepEqual(run('room', ['approach', 'stepDone']), ['zoomIn', 'working']);
+});
+
+test('the notebook opens and closes only from the room', () => {
+  assert.deepEqual(run('room', ['openNotebook', 'stepDone', 'closeNotebook', 'stepDone']),
+    ['notebookOpen', 'notebook', 'notebookClose', 'room']);
+  for (const s of ['working', 'dark', 'zoomIn'] as const) assert.equal(reduceScene(s, { type: 'openNotebook' }), s);
+});
+
+test('the red button in the room powers off without zooming', () => {
+  assert.deepEqual(run('room', ['shutdown', 'stepDone', 'stepDone']), ['screenOff', 'lightsOff', 'dark']);
+});
+
+test('the screen stays on in the room and behind the notebook; typing only at work', () => {
+  for (const s of ['stepBack', 'room', 'notebookOpen', 'notebook', 'notebookClose'] as const) {
+    assert.equal(crtPhase(s), 'on', s);
+    assert.equal(acceptsInput(s), false, s);
+    assert.equal(isLit(s), true, s);
+    assert.equal(isZoomed(s), false, s);
+  }
+  assert.equal(inRoom('room'), true);
+  assert.equal(notebookShown('notebookOpen'), true);
+  assert.equal(notebookShown('room'), false);
+});
+
+test('reduced motion makes the new transitions instant', () => {
+  for (const s of ['stepBack', 'notebookOpen', 'notebookClose'] as const) {
+    assert.equal(stepDuration(s, true), 0);
+    assert.ok((stepDuration(s, false) ?? 0) > 0);
   }
 });
