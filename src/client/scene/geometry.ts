@@ -15,7 +15,7 @@ const box = (x0: number, y0: number, x1: number, y1: number): Rect =>
 const glow = (x: number, y: number, w: number, h: number): Glow =>
   ({ x: x / PW, y: y / PH, w: w / PW, h: h / PH });
 
-export const GLASS = { rect: box(416, 152, 608, 306), radius: 22 / PW };
+export const GLASS = { rect: box(416, 152, 608, 306), radius: 22 / PW, bulge: { x: 6 / PW, y: 7 / PH } };
 export const SCREEN = box(410, 146, 614, 312);
 export const ZOOM = { origin: fromPhoto(512, 270), scale: 1.75 };
 export const NOTEBOOK = box(800, 503, 972, 572);
@@ -40,11 +40,22 @@ export function glassMaskDataUri(): string {
   const x1 = x0 + GLASS.rect.width * PW;
   const y1 = y0 + GLASS.rect.height * PH;
   const r = GLASS.radius * PW;
+  const bx = GLASS.bulge.x * PW;
+  const by = GLASS.bulge.y * PH;
+  const mx = (x0 + x1) / 2;
+  const my = (y0 + y1) / 2;
   const f = (n: number): string => String(Math.round(n * 100) / 100);
   const hole = [
-    `M${f(x0 + r)} ${f(y0)}`, `H${f(x1 - r)}`, `Q${f(x1)} ${f(y0)} ${f(x1)} ${f(y0 + r)}`,
-    `V${f(y1 - r)}`, `Q${f(x1)} ${f(y1)} ${f(x1 - r)} ${f(y1)}`, `H${f(x0 + r)}`,
-    `Q${f(x0)} ${f(y1)} ${f(x0)} ${f(y1 - r)}`, `V${f(y0 + r)}`, `Q${f(x0)} ${f(y0)} ${f(x0 + r)} ${f(y0)}`, 'Z',
+    `M${f(x0 + r)} ${f(y0 + by)}`,
+    `Q${f(mx)} ${f(y0 - by)} ${f(x1 - r)} ${f(y0 + by)}`,
+    `Q${f(x1 - bx)} ${f(y0 + by)} ${f(x1 - bx)} ${f(y0 + r)}`,
+    `Q${f(x1 + bx)} ${f(my)} ${f(x1 - bx)} ${f(y1 - r)}`,
+    `Q${f(x1 - bx)} ${f(y1 - by)} ${f(x1 - r)} ${f(y1 - by)}`,
+    `Q${f(mx)} ${f(y1 + by)} ${f(x0 + r)} ${f(y1 - by)}`,
+    `Q${f(x0 + bx)} ${f(y1 - by)} ${f(x0 + bx)} ${f(y1 - r)}`,
+    `Q${f(x0 - bx)} ${f(my)} ${f(x0 + bx)} ${f(y0 + r)}`,
+    `Q${f(x0 + bx)} ${f(y0 + by)} ${f(x0 + r)} ${f(y0 + by)}`,
+    'Z',
   ].join('');
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${PW} ${PH}' preserveAspectRatio='none'>`
     + `<path fill='white' fill-rule='evenodd' d='M0 0H${PW}V${PH}H0Z ${hole}'/></svg>`;
