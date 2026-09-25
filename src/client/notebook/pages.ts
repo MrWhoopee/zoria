@@ -24,11 +24,12 @@ export type Page =
   | { kind: 'blank' };
 
 const lines = (text: string, cols: number): number => wrap(text, cols).length;
+const codeRows = (line: string, cols: number): number => Math.max(1, Math.ceil(Array.from(line).length / cols));
 
 export function blockRows(b: Block, cols = PAGE_COLS): number {
   if (b.t === 'heading' || b.t === 'para') return lines(plainText(b.inline, false), cols) + 1;
   if (b.t === 'list') return b.items.reduce((n, item) => n + lines(plainText(item, false), cols - LIST_INDENT), 0) + 1;
-  return b.lines.length + 2;
+  return b.lines.reduce((n, l) => n + codeRows(l, cols), 0) + 1;
 }
 
 function headerRows(title: string, errata: string | null, cols: number): number {
@@ -56,8 +57,13 @@ function split(b: Block, room: number, cols: number): [Block, Block] | null {
     return [{ ...b, items: b.items.slice(0, k) }, { ...b, items: b.items.slice(k) }];
   }
   if (b.t === 'code') {
-    const take = room - 2;
-    if (take < 1 || take >= b.lines.length) return null;
+    let used = 1;
+    let take = 0;
+    while (take < b.lines.length && used + codeRows(b.lines[take], cols) <= room) {
+      used += codeRows(b.lines[take], cols);
+      take += 1;
+    }
+    if (take === 0 || take === b.lines.length) return null;
     return [{ t: 'code', lines: b.lines.slice(0, take) }, { t: 'code', lines: b.lines.slice(take) }];
   }
   return null;

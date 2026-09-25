@@ -63,5 +63,10 @@ test('block heights follow the typewriter grid', () => {
   assert.equal(blockRows(h), 2);
   assert.equal(blockRows(p), 2);
   assert.equal(blockRows(l), 3);
-  assert.equal(blockRows(c), 4);
+  assert.equal(blockRows(c), 3);
+});
+
+test('a code line wider than the page wraps onto the next rows instead of scrolling', () => {
+  const [c] = parseMarkdown(['```', 'x'.repeat(PAGE_COLS * 2 + 1), '', '```'].join('\n'));
+  assert.equal(blockRows(c), 3 + 1 + 1);
 });
