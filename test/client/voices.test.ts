@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HUM_PARTIALS, crackleParams, dipGain } from '../../src/client/audio/voices.ts';
+import { HUM_PARTIALS, crackleParams, dipGain, pageTurnParams } from '../../src/client/audio/voices.ts';
 
 test('the hum is 50 Hz mains with falling harmonics', () => {
   assert.equal(HUM_PARTIALS[0].hz, 50);
@@ -32,4 +32,13 @@ test('the crackle decay is bounded however long the flicker', () => {
 test('the crackle colour varies within a fixed band', () => {
   assert.equal(crackleParams({ lamp: 'l', depth: 0.5, durationMs: 80 }, () => 0).cutoffHz, 1800);
   assert.equal(crackleParams({ lamp: 'l', depth: 0.5, durationMs: 80 }, () => 1).cutoffHz, 4400);
+});
+
+test('a page turn is a short rising rustle within safe bounds', () => {
+  for (const r of [0, 0.5, 0.999]) {
+    const p = pageTurnParams(() => r);
+    assert.ok(p.durMs >= 200 && p.durMs <= 400, `dur ${p.durMs}`);
+    assert.ok(p.toHz > p.fromHz);
+    assert.ok(p.peak > 0 && p.peak <= 0.1);
+  }
 });

@@ -1,5 +1,5 @@
 import type { FlickerEvent } from '../scene/flicker.ts';
-import { HUM_LEVEL, HUM_PARTIALS, crackleParams, dipGain } from './voices.ts';
+import { HUM_LEVEL, HUM_PARTIALS, crackleParams, dipGain, pageTurnParams } from './voices.ts';
 
 export type SampleName = 'relay' | 'crtOn' | 'crtOff' | 'key1' | 'key2' | 'key3' | 'space';
 
@@ -10,6 +10,7 @@ export type AudioEngine = {
   flicker(e: FlickerEvent): void;
   play(name: SampleName): void;
   key(code: string): void;
+  page(): void;
   close(): void;
 };
 
@@ -37,7 +38,7 @@ export function createAudioEngine(urls: Partial<Record<SampleName, string>>): Au
       osc.connect(g).connect(bus);
       osc.start();
     }
-    const n = c.createBuffer(1, Math.floor(c.sampleRate * 0.25), c.sampleRate);
+    const n = c.createBuffer(1, Math.floor(c.sampleRate * 0.5), c.sampleRate);
     const data = n.getChannelData(0);
     for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
     ctx = c;
@@ -105,6 +106,27 @@ export function createAudioEngine(urls: Partial<Record<SampleName, string>>): Au
     play(KEY_SAMPLES[keyTurn]);
   }
 
+  function page(): void {
+    if (!ctx || !noise) return;
+    const t = ctx.currentTime;
+    const p = pageTurnParams(Math.random);
+    const end = t + p.durMs / 1000;
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 0.8;
+    band.frequency.setValueAtTime(p.fromHz, t);
+    band.frequency.exponentialRampToValueAtTime(p.toHz, end);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(p.peak, t + p.durMs / 3000);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    src.connect(band).connect(g).connect(ctx.destination);
+    src.start(t);
+    src.stop(end + 0.02);
+  }
+
   function close(): void {
     const c = ctx;
     ctx = null;
@@ -114,5 +136,5 @@ export function createAudioEngine(urls: Partial<Record<SampleName, string>>): Au
     if (c) c.close().catch((err: unknown) => { console.warn('audio close failed:', err); });
   }
 
-  return { load, unlock, setLit, flicker, play, key, close };
+  return { load, unlock, setLit, flicker, play, key, page, close };
 }

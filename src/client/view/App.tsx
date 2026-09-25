@@ -13,10 +13,7 @@ export function App() {
   const snapshot = useAgent();
   const audio = useMemo(() => createAudioEngine(SAMPLE_URLS), []);
 
-  useEffect(() => {
-    audio.load();
-    return () => audio.close();
-  }, [audio]);
+  useEffect(() => () => audio.close(), [audio]);
 
   useEffect(() => {
     const ms = stepDuration(scene, reducedMotion);
@@ -42,7 +39,7 @@ export function App() {
   const onApproach = useCallback(() => dispatch({ type: 'approach' }), []);
   const onOpenNotebook = useCallback(() => dispatch({ type: 'openNotebook' }), []);
   const onCloseNotebook = useCallback(() => dispatch({ type: 'closeNotebook' }), []);
-  const onTurnPage = useCallback(() => undefined, []);
+  const onTurnPage = useCallback(() => audio.page(), [audio]);
 
   useEffect(() => {
     if (scene !== 'room') return;

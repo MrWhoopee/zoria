@@ -24,3 +24,14 @@ export function crackleParams(e: FlickerEvent, rand: () => number): Crackle {
     cutoffHz: 1800 + rand() * 2600,
   };
 }
+
+export type PageTurn = { durMs: number; fromHz: number; toHz: number; peak: number };
+
+export function pageTurnParams(rand: () => number): PageTurn {
+  return {
+    durMs: 240 + rand() * 120,
+    fromHz: 900 + rand() * 300,
+    toHz: 3200 + rand() * 900,
+    peak: 0.06,
+  };
+}
