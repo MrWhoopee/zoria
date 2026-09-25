@@ -15,7 +15,7 @@ const box = (x0: number, y0: number, x1: number, y1: number): Rect =>
 const glow = (x: number, y: number, w: number, h: number): Glow =>
   ({ x: x / PW, y: y / PH, w: w / PW, h: h / PH });
 
-export const GLASS = { rect: box(416, 152, 608, 306), exponent: 5 };
+export const GLASS = { rect: box(415, 151, 609, 307), radius: 20 / PW };
 export const SCREEN = box(410, 146, 614, 312);
 export const ZOOM = { origin: fromPhoto(512, 270), scale: 1.75 };
 export const NOTEBOOK = box(800, 503, 972, 572);
@@ -34,28 +34,18 @@ export const METERS: Glow[] = [
   glow(138, 298, 57, 14), glow(245, 331, 41, 14),
 ];
 
-const OUTLINE_POINTS = 256;
-
-export function glassOutline(): Point[] {
-  const a = (GLASS.rect.width * PW) / 2;
-  const b = (GLASS.rect.height * PH) / 2;
-  const cx = GLASS.rect.left * PW + a;
-  const cy = GLASS.rect.top * PH + b;
-  const n = GLASS.exponent;
-  const points: Point[] = [];
-  for (let k = 0; k < OUTLINE_POINTS; k += 1) {
-    const t = (2 * Math.PI * k) / OUTLINE_POINTS;
-    const c = Math.cos(t);
-    const s = Math.sin(t);
-    const r = (Math.abs(c / a) ** n + Math.abs(s / b) ** n) ** (-1 / n);
-    points.push({ x: cx + r * c, y: cy + r * s });
-  }
-  return points;
-}
-
 export function glassMaskDataUri(): string {
-  const f = (v: number): string => String(Math.round(v * 100) / 100);
-  const hole = glassOutline().map((p, k) => `${k === 0 ? 'M' : 'L'}${f(p.x)} ${f(p.y)}`).join('') + 'Z';
+  const x0 = GLASS.rect.left * PW;
+  const y0 = GLASS.rect.top * PH;
+  const x1 = x0 + GLASS.rect.width * PW;
+  const y1 = y0 + GLASS.rect.height * PH;
+  const r = GLASS.radius * PW;
+  const f = (n: number): string => String(Math.round(n * 100) / 100);
+  const hole = [
+    `M${f(x0 + r)} ${f(y0)}`, `H${f(x1 - r)}`, `Q${f(x1)} ${f(y0)} ${f(x1)} ${f(y0 + r)}`,
+    `V${f(y1 - r)}`, `Q${f(x1)} ${f(y1)} ${f(x1 - r)} ${f(y1)}`, `H${f(x0 + r)}`,
+    `Q${f(x0)} ${f(y1)} ${f(x0)} ${f(y1 - r)}`, `V${f(y0 + r)}`, `Q${f(x0)} ${f(y0)} ${f(x0 + r)} ${f(y0)}`, 'Z',
+  ].join('');
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${PW} ${PH}' preserveAspectRatio='none'>`
     + `<path fill='white' fill-rule='evenodd' d='M0 0H${PW}V${PH}H0Z ${hole}'/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
