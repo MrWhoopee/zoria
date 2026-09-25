@@ -7,6 +7,9 @@ import { whenLocal } from '../terminal/status.ts';
 import { describeFailure } from '../terminal/errors.ts';
 import { ackStage } from '../agent/actions.ts';
 import { useStageTexts } from './useStageTexts.ts';
+import { useTurn } from './useTurn.ts';
+import { CurlLayers, Corner } from './PageCurl.tsx';
+import type { Side } from '../notebook/curl.ts';
 import type { StageSummary } from '../../agent/account.ts';
 import { A } from '../anchors.ts';
 
@@ -19,7 +22,6 @@ type Props = {
   onTurn: () => void;
 };
 
-const TURN_MS = 450;
 const ASPECT = 572 / 1024;
 
 function InlineView({ items }: { items: Inline[] }) {
@@ -75,7 +77,9 @@ function Stamp({ stageId, acknowledgedAt, zone }: { stageId: string; acknowledge
   );
 }
 
-function PageView({ page, zone, onJump }: { page: Page | undefined; zone: string; onJump: (page: number) => void }) {
+function PageView({ page, zone, side, hidden = false, onJump }: {
+  page: Page | undefined; zone: string; side: 'left' | 'right'; hidden?: boolean; onJump: (page: number) => void;
+}) {
   let content: ReactNode = null;
   if (page?.kind === 'contents') {
     content = (
@@ -117,7 +121,7 @@ function PageView({ page, zone, onJump }: { page: Page | undefined; zone: string
       </>
     );
   }
-  return <section className="nb-page" data-zaria={A.notebookPage}>{content}</section>;
+  return <section className={`nb-page ${side}${hidden ? ' turning' : ''}`} data-zaria={A.notebookPage}>{content}</section>;
 }
 
 export function Notebook({ scene, stages, zone, reducedMotion, onClose, onTurn }: Props) {
@@ -127,21 +131,33 @@ export function Notebook({ scene, stages, zone, reducedMotion, onClose, onTurn }
   const pages = useMemo(() => (shown ? notebookPages(stages, texts) : []), [stagesKey, texts, shown]);
   const spreads = Math.max(1, pages.length / 2);
   const [spread, setSpread] = useState(0);
-  const [turn, setTurn] = useState<'next' | 'prev' | null>(null);
   const current = Math.min(spread, spreads - 1);
+  const book = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (turn === null) return;
-    const t = setTimeout(() => setTurn(null), TURN_MS);
-    return () => clearTimeout(t);
-  }, [turn]);
-
-  const go = (to: number): void => {
-    const target = Math.max(0, Math.min(spreads - 1, to));
-    if (target === current) return;
-    setSpread(target);
-    if (!reducedMotion) setTurn(target > current ? 'next' : 'prev');
+  const turn = useTurn((side, completed) => {
+    if (!completed) return;
     onTurn();
+    setSpread((s) => Math.max(0, Math.min(spreads - 1, s + (side === 'next' ? 1 : -1))));
+  });
+
+  const measure = () => {
+    const el = book.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return {
+      size: { w: rect.width / 2, h: rect.height },
+      toBook: (e: { clientX: number; clientY: number }) => ({ x: e.clientX - rect.left, y: e.clientY - rect.top }),
+    };
+  };
+
+  const go = (side: Side): void => {
+    const to = current + (side === 'next' ? 1 : -1);
+    if (to < 0 || to > spreads - 1 || turn.busy) return;
+    const m = measure();
+    if (reducedMotion || !m) {
+      onTurn();
+      setSpread(to);
+    } else turn.auto(side, m.size);
   };
   const goRef = useRef(go);
   useEffect(() => { goRef.current = go; });
@@ -150,12 +166,12 @@ export function Notebook({ scene, stages, zone, reducedMotion, onClose, onTurn }
     if (scene !== 'notebook') return;
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-      else if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); goRef.current(current + 1); }
-      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goRef.current(current - 1); }
+      else if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); goRef.current('next'); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goRef.current('prev'); }
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
-  }, [scene, current, onClose]);
+  }, [scene, onClose]);
 
   if (!shown) return null;
 
@@ -168,14 +184,41 @@ export function Notebook({ scene, stages, zone, reducedMotion, onClose, onTurn }
     '--rows': PAGE_ROWS,
   } as CSSProperties;
 
+  const jump = (p: number): void => { if (!turn.busy) setSpread(Math.floor(p / 2)); };
+  const page = (i: number, side: 'left' | 'right') => <PageView page={pages[i]} zone={zone} side={side} onJump={jump} />;
+  const turning = turn.frame.side;
+  const ahead = turning === 'next' ? current + 1 : current - 1;
+  const canNext = current < spreads - 1;
+  const canPrev = current > 0;
+
   return (
     <div className={`notebook ${scene}`} data-zaria={A.notebook} style={style} onClick={onClose}>
-      <div className="nb-book" onClick={(e) => e.stopPropagation()}>
-        <PageView page={pages[current * 2]} zone={zone} onJump={(p) => go(Math.floor(p / 2))} />
-        <PageView page={pages[current * 2 + 1]} zone={zone} onJump={(p) => go(Math.floor(p / 2))} />
-        {turn && <div className={`nb-leaf ${turn}`} />}
-        <button type="button" className="nb-edge prev" data-zaria={A.notebookPrev} aria-label="Попередні сторінки" disabled={current === 0} onClick={() => go(current - 1)} />
-        <button type="button" className="nb-edge next" data-zaria={A.notebookNext} aria-label="Наступні сторінки" disabled={current >= spreads - 1} onClick={() => go(current + 1)} />
+      <div className="nb-book" ref={book} onClick={(e) => e.stopPropagation()}>
+        <PageView page={pages[current * 2]} zone={zone} side="left" hidden={turning === 'prev'} onJump={jump} />
+        <PageView page={pages[current * 2 + 1]} zone={zone} side="right" hidden={turning === 'next'} onJump={jump} />
+        <CurlLayers
+          frame={turn.frame}
+          size={turn.size}
+          turning={turning === 'next' ? page(current * 2 + 1, 'right') : page(current * 2, 'left')}
+          under={turning === 'next' ? page(ahead * 2 + 1, 'right') : page(ahead * 2, 'left')}
+          back={turning === 'next' ? page(ahead * 2, 'left') : page(ahead * 2 + 1, 'right')}
+        />
+        <button type="button" className="nb-edge prev" data-zaria={A.notebookPrev} aria-label="Попередні сторінки" disabled={!canPrev} onClick={() => go('prev')} />
+        <button type="button" className="nb-edge next" data-zaria={A.notebookNext} aria-label="Наступні сторінки" disabled={!canNext} onClick={() => go('next')} />
+        {(['prev', 'next'] as const).map((side) => (
+          <Corner
+            key={side}
+            side={side}
+            enabled={!reducedMotion && (side === 'next' ? canNext : canPrev)}
+            dragging={turn.dragging}
+            measure={measure}
+            onPeek={turn.peek}
+            onUnpeek={turn.unpeek}
+            onGrab={turn.grab}
+            onMove={turn.move}
+            onDrop={turn.drop}
+          />
+        ))}
         <div className="nb-folio">{current * 2 + 1}–{current * 2 + 2} / {pages.length}</div>
       </div>
     </div>

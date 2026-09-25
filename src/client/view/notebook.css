@@ -16,8 +16,8 @@
 }
 .nb-page::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .35; mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .35 0 0 0 0 .2 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-.nb-page:first-child { border-radius: .6cqw 0 0 .6cqw; box-shadow: inset -1.2cqw 0 1.2cqw -1cqw rgba(60, 40, 10, .35); }
-.nb-page:nth-child(2) { border-radius: 0 .6cqw .6cqw 0; box-shadow: inset 1.2cqw 0 1.2cqw -1cqw rgba(60, 40, 10, .35); }
+.nb-page.left { border-radius: .6cqw 0 0 .6cqw; box-shadow: inset -1.2cqw 0 1.2cqw -1cqw rgba(60, 40, 10, .35); }
+.nb-page.right { border-radius: 0 .6cqw .6cqw 0; box-shadow: inset 1.2cqw 0 1.2cqw -1cqw rgba(60, 40, 10, .35); }
 
 .nb-title, .nb-h { font-size: 1em; line-height: var(--line); margin: 0 0 var(--line); font-weight: bold; text-transform: uppercase; overflow-wrap: anywhere; }
 .nb-p { margin: 0 0 var(--line); overflow-wrap: anywhere; }
@@ -47,17 +47,21 @@
 .nb-edge:disabled { cursor: default; }
 .nb-edge:hover:not(:disabled) { background: linear-gradient(90deg, rgba(255, 220, 150, .0), rgba(255, 220, 150, .18)); }
 .nb-edge.prev:hover:not(:disabled) { background: linear-gradient(270deg, rgba(255, 220, 150, .0), rgba(255, 220, 150, .18)); }
+.nb-page.turning { visibility: hidden; }
+.curl, .curl-layer { position: absolute; inset: 0; pointer-events: none; }
+.curl-page { position: absolute; top: 0; transform-origin: 0 0; }
+.curl-back .nb-page { box-shadow: inset 0 0 2cqw rgba(60, 40, 10, .25); }
+.curl-shadow { position: absolute; transform-origin: 50% 50%; background: linear-gradient(to bottom, transparent, rgba(40, 25, 5, .32) 50%, transparent); }
+.curl-corner { position: absolute; top: 0; width: 9%; aspect-ratio: 1; z-index: 3; cursor: grab; touch-action: none; }
+.curl-corner:active { cursor: grabbing; }
+.curl-corner.next { right: 0; }
+.curl-corner.prev { left: 0; }
 .nb-folio { position: absolute; bottom: .6em; left: 0; right: 0; text-align: center; opacity: .6; pointer-events: none; }
 
-.nb-leaf { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient(90deg, #e9dbb3, #dcc893); pointer-events: none; backface-visibility: hidden; }
-.nb-leaf.next { left: 50%; transform-origin: 0 50%; animation: nb-turn-next .45s ease-in-out forwards; }
-.nb-leaf.prev { left: 0; transform-origin: 100% 50%; animation: nb-turn-prev .45s ease-in-out forwards; }
 
 @keyframes nb-dim { from { opacity: 0; } to { opacity: 1; } }
 @keyframes nb-lift { from { transform: translate(var(--fx), var(--fy)) scale(.18) rotateX(55deg); opacity: .4; } to { transform: none; opacity: 1; } }
-@keyframes nb-turn-next { from { transform: perspective(120cqw) rotateY(0); } to { transform: perspective(120cqw) rotateY(-180deg); } }
-@keyframes nb-turn-prev { from { transform: perspective(120cqw) rotateY(0); } to { transform: perspective(120cqw) rotateY(180deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .notebook::before, .notebook .nb-book, .nb-leaf { animation: none !important; transition: none; }
+  .notebook::before, .notebook .nb-book { animation: none !important; transition: none; }
 }

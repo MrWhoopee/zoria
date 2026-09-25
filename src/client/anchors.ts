@@ -13,5 +13,6 @@ export const A = {
   notebookPrev: 'notebook.prev',
   notebookNext: 'notebook.next',
   notebookAck: 'notebook.ack',
+  notebookCorner: 'notebook.corner',
   notebookErrata: 'notebook.errata',
 } as const;
