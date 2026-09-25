@@ -222,9 +222,12 @@ export async function startLocalApi(opts: LocalApiOptions): Promise<{ port: numb
         }
         send(404, { error: 'not found' });
       } catch (err) {
-        send(400, { error: err instanceof Error ? err.message : 'bad request' });
+        if (res.headersSent) res.end();
+        else send(400, { error: err instanceof Error ? err.message : 'bad request' });
       }
-    })();
+    })().catch((err: unknown) => {
+      console.error('local API request failed:', err instanceof Error ? err.message : err);
+    });
   });
 
   await new Promise<void>((r) => server.listen(opts.port, '127.0.0.1', () => r()));

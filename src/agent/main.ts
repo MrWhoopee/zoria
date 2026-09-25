@@ -2,6 +2,7 @@ import { loadConfig } from './config.ts';
 import { loadState, StateBox } from './store.ts';
 import { EtherLoop } from './ether-loop.ts';
 import { Registrar } from './registrar.ts';
+import { asPublicKey } from './wire.ts';
 import { callReply, startLocalApi, type ActionReply } from './local-api.ts';
 import { Session } from './session.ts';
 import { makeCaller, fetchRepoAccess } from './server.ts';
@@ -57,11 +58,7 @@ async function fetchStationKey(): Promise<RawResponse> {
 
 const keyRes = await fetchStationKey();
 
-let publicKey: string | null = null;
-try {
-  const parsed = JSON.parse(keyRes.body) as { publicKey?: unknown };
-  if (typeof parsed.publicKey === 'string') publicKey = parsed.publicKey;
-} catch {}
+const publicKey = asPublicKey(keyRes.body);
 
 if (publicKey === null) {
   console.error(
@@ -186,6 +183,12 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     loop.stop();
     mailroom.stop();
-    void api.close().then(() => process.exit(0));
+    api.close().then(
+      () => process.exit(0),
+      (err: unknown) => {
+        console.error('could not close the local API:', err instanceof Error ? err.message : err);
+        process.exit(1);
+      },
+    );
   });
 }

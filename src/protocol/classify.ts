@@ -1,6 +1,7 @@
 import type { Frame } from './types.ts';
 import type { KeyRing } from './keyring.ts';
 import { verifyEnvelope, type NoiseReason } from './envelope.ts';
+import { errorCode } from './error-code.ts';
 
 export type Observation =
   | { t: 'signal'; frame: Frame; frameAt: number; receivedAt: number }
@@ -20,16 +21,6 @@ export type RawResponse = {
 const DEFAULT_JAM_MS = 60_000;
 const DEFAULT_STOPPING_MS = 30_000;
 const RETRY_AFTER_CEILING_MS = 1_800_000;
-
-function errorCode(body: string): string | null {
-  try {
-    const v = JSON.parse(body);
-    const code = (v as { error?: { code?: unknown } })?.error?.code;
-    return typeof code === 'string' ? code : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function classifyResponse(r: RawResponse, ring: KeyRing): Promise<Observation> {
   if (r.status === 429) {
