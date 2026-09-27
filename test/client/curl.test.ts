@@ -45,7 +45,20 @@ test('turning back mirrors turning forward', () => {
   assert.ok(fwd && back);
   if (fwd && back) assert.ok(near(area(fwd.leaf), area(back.leaf), 1e-3));
   const done = curl('prev', F, target('prev', F));
-  assert.ok(done && near(done.backMatrix[0], 1) && near(done.backMatrix[4], 0));
+  assert.ok(done && near(done.backMatrix[0], 1) && near(done.backMatrix[4], F.w));
+});
+
+test('the back of the leaf follows the pointer by its outer corner on either side', () => {
+  const apply = (m: number[], q: Point): Point => ({ x: m[0] * q.x + m[2] * q.y + m[4], y: m[1] * q.x + m[3] * q.y + m[5] });
+  const cases = [
+    { side: 'next' as const, pointer: { x: 560, y: 120 }, corner: { x: 0, y: 0 } },
+    { side: 'prev' as const, pointer: { x: 240, y: 120 }, corner: { x: F.w, y: 0 } },
+  ];
+  for (const { side, pointer, corner } of cases) {
+    const g = curl(side, F, pointer);
+    assert.ok(g);
+    if (g) assert.ok(samePoint(apply(g.backMatrix, corner), pointer), side);
+  }
 });
 
 test('the paper never tears away from the spine', () => {

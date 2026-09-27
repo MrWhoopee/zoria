@@ -120,11 +120,12 @@ export function curl(s: Side, f: PageFrame, pointer: Point): Curl | null {
   const rect = pageRect(s, f);
   const leaf = clipHalf(rect, fold, corner);
   const spine: Line = { p: { x: f.w, y: 0 }, d: { x: 0, y: 1 } };
+  const backX = s === 'next' ? 0 : f.w;
   return {
     page: clipHalf(rect, fold, p),
     leaf,
     back: leaf.map((q) => reflect(fold, q)),
-    backMatrix: compose(reflectionMatrix(fold), reflectionMatrix(spine)),
+    backMatrix: compose(compose(reflectionMatrix(fold), reflectionMatrix(spine)), [1, 0, 0, 1, backX, 0]),
     shadow: {
       x: fold.p.x,
       y: fold.p.y,

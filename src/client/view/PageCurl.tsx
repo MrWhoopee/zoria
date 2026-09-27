@@ -42,7 +42,7 @@ export function CurlLayers({ frame, size, turning, under, back }: LayersProps) {
         <Shadow g={g} size={size} />
       </div>
       <div className="curl-layer" style={{ clipPath: polygonCss(g.back) }}>
-        <div className="curl-page curl-back" style={{ left: backX, transform: matrixCss(g.backMatrix) }}>{back}</div>
+        <div className="curl-page curl-back" style={{ left: 0, transform: matrixCss(g.backMatrix) }}>{back}</div>
         <Shadow g={g} size={size} />
       </div>
     </div>
