@@ -14,7 +14,8 @@
     "play": "npm run build && zaria-kit pack",
     "train": "npm run build && zaria-kit pack --fast --packs 8 --seed 100",
     "lint:nakaz": "zaria-kit lint nakaz.yaml",
-    "check": "npm run build && npm test && zaria-kit lint nakaz.yaml"
+    "check": "npm run build && npm test && zaria-kit lint nakaz.yaml",
+    "typecheck": "tsc -p tsconfig.check.json"
   },
   "zaria": {
     "bot": "node dist/main.js",
