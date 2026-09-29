@@ -2,6 +2,7 @@ import { orderCost } from '@zoria/protocol';
 import type { ChannelCfg, MineUnit, Order, OrderKind } from '@zoria/protocol';
 import type { Cell } from '../hex.ts';
 import type { Links } from '../map/links.ts';
+import type { Preset } from '../preset.ts';
 import { cfg } from '../map/valley.ts';
 import type { Valley } from '../map/valley.ts';
 import type { World } from '../world.ts';
@@ -29,6 +30,7 @@ export interface Ctx {
   w: World;
   links: Links;
   memo: Memo;
+  preset: Preset;
 }
 
 export interface Task {

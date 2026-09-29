@@ -8,6 +8,8 @@ import { Brain } from './brain.ts';
 import type { BrainStats } from './brain.ts';
 import { Links } from './map/links.ts';
 import { buildValley } from './map/valley.ts';
+import { PRESETS, presetOf } from './preset.ts';
+import type { Preset } from './preset.ts';
 
 export interface Strategy extends WireBot {
   belief(obs: Observe | null): BeliefFrame | null;
@@ -16,12 +18,17 @@ export interface Strategy extends WireBot {
 
 class BrainStrategy implements Strategy {
   private brain: Brain | null = null;
+  private readonly preset: Preset;
+
+  constructor(preset: Preset) {
+    this.preset = preset;
+  }
 
   init(manifest: Uint8Array, slot: SlotName): void {
     const m = decodeManifest(manifest);
     if (!m) throw new Error('manifest did not decode');
     const v = buildValley(m, slot);
-    this.brain = new Brain(v, new Links(new RulesOracle(createEngine, manifest), v));
+    this.brain = new Brain(v, new Links(new RulesOracle(createEngine, manifest), v), undefined, undefined, this.preset);
   }
 
   tick(observe: Uint8Array): Uint8Array {
@@ -45,9 +52,9 @@ class BrainStrategy implements Strategy {
 }
 
 export function presets(): string[] {
-  return ['основний'];
+  return Object.keys(PRESETS);
 }
 
-export function createStrategy(_preset = 'основний'): Strategy {
-  return new BrainStrategy();
+export function createStrategy(preset = 'основний'): Strategy {
+  return new BrainStrategy(presetOf(preset));
 }
