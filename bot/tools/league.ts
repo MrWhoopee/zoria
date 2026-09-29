@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { parseArgs } from 'node:util';
 import { Worker } from 'node:worker_threads';
@@ -6,7 +6,7 @@ import { PRESETS } from '../src/preset.ts';
 import { jobs, trios } from './league/jobs.ts';
 import type { Job } from './league/jobs.ts';
 import { ARCHETYPE_NAMES, kindOf } from './league/roster.ts';
-import { headToHead, standings, worst } from './league/table.ts';
+import { report } from './league/report.ts';
 import type { PackRecord } from './league/table.ts';
 import type { WorkerJob, WorkerReply } from './league/worker.ts';
 
@@ -17,7 +17,7 @@ const { values } = parseArgs({
     seeds: { type: 'string', default: '4' },
     from: { type: 'string', default: '100' },
     ticks: { type: 'string', default: '1200' },
-    workers: { type: 'string', default: String(Math.max(1, cpus().length - 2)) },
+    workers: { type: 'string', default: String(Math.max(1, Math.floor(cpus().length / 2) - 2)) },
   },
 });
 
@@ -33,7 +33,10 @@ const log = (line: string): void => {
   process.stdout.write(line + '\n');
 };
 
-log('ліга: ' + todo.length + ' пакетів, ' + width + ' працівників, тактів ' + ticks);
+mkdirSync('league', { recursive: true });
+const file = 'league/' + new Date().toISOString().replace(/[:.]/g, '-') + '.ndjson';
+writeFileSync(file, '');
+log('ліга: ' + todo.length + ' пакетів, ' + width + ' працівників, тактів ' + ticks + ', записи: ' + file);
 
 function runAll(): Promise<PackRecord[]> {
   return new Promise((done) => {
@@ -55,8 +58,10 @@ function runAll(): Promise<PackRecord[]> {
       const w = new Worker(new URL('./league/worker.ts', import.meta.url));
       w.on('message', (reply: WorkerReply) => {
         finished++;
-        if (reply.ok) records.push(reply.record);
-        else {
+        if (reply.ok) {
+          records.push(reply.record);
+          appendFileSync(file, JSON.stringify(reply.record) + '\n');
+        } else {
           failed++;
           log('збій: ' + reply.job.cast.join(',') + ' жереб ' + reply.job.seed + ': ' + reply.error);
         }
@@ -75,30 +80,6 @@ function runAll(): Promise<PackRecord[]> {
   });
 }
 
-const pad = (s: string | number, n: number): string => String(s).padStart(n);
-const fix = (x: number): string => x.toFixed(1);
-
 const records = await runAll();
-const st = standings(records);
 log('');
-log('учасник'.padEnd(34) + pad('пакетів', 8) + pad('частка/9', 9) + pad('перших', 8) + pad('мережа', 8) + pad('замовл', 8) + pad('вкрадено', 9) + pad('завад', 7) + pad('таранів', 8));
-for (const s of st) {
-  log((s.name + ' [' + kindOf(s.name) + ']').padEnd(34) + pad(s.packs, 8) + pad(s.mean.toFixed(2), 9) + pad(Math.round((100 * s.firsts) / s.packs) + '%', 8) + pad(fix(s.network), 8) + pad(fix(s.orders), 8) + pad(fix(s.stolen), 9) + pad(fix(s.jams), 7) + pad(fix(s.rams), 8));
-}
-const names = st.map((s) => s.name);
-for (const p of players) {
-  log('');
-  log(p + ' проти кожного (середня різниця часток за пакет):');
-  for (const n of names) {
-    if (n === p) continue;
-    const h = headToHead(records, p, n);
-    if (h.packs > 0) log('  ' + n.padEnd(32) + pad((h.diff >= 0 ? '+' : '') + h.diff.toFixed(2), 7) + pad('(' + h.packs + ')', 6));
-  }
-  log('  найгірші пакети:');
-  for (const r of worst(records, p, 3)) log('    жереб ' + r.seed + ' ' + r.cast.join(', ') + ' -> ' + r.shares.join('/'));
-}
-mkdirSync('league', { recursive: true });
-const file = 'league/' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
-writeFileSync(file, JSON.stringify({ players, pool, seeds, ticks, records }, null, 1));
-log('');
-log('записано: ' + file);
+for (const line of report(records, players)) log(line);

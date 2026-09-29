@@ -53,3 +53,13 @@ test('standings, head to head and worst packs', () => {
   assert.deepEqual(headToHead(rs, 'p', 'z'), { packs: 0, diff: 0 });
   assert.deepEqual(worst(rs, 'p', 2).map((r) => r.seed), [2, 3]);
 });
+
+test('report lists standings and head to head for players', async () => {
+  const { report, readRecords } = await import('../tools/league/report.ts');
+  const rs = [rec(1, ['основний', 'рівний', 'шир'], [5, 2, 2])];
+  const back = readRecords(rs.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  assert.deepEqual(back, rs);
+  const lines = report(back, ['основний']);
+  assert.ok(lines.some((l) => l.startsWith('основний [preset]')));
+  assert.ok(lines.some((l) => l.includes('рівний') && l.includes('+3.00')));
+});
