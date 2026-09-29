@@ -1,12 +1,12 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { parseArgs } from 'node:util';
 import { Worker } from 'node:worker_threads';
 import { PRESETS } from '../src/preset.ts';
-import { jobs, trios } from './league/jobs.ts';
+import { jobs, pending, trios } from './league/jobs.ts';
 import type { Job } from './league/jobs.ts';
 import { ARCHETYPE_NAMES, kindOf } from './league/roster.ts';
-import { report } from './league/report.ts';
+import { readRecords, report } from './league/report.ts';
 import type { PackRecord } from './league/table.ts';
 import type { WorkerJob, WorkerReply } from './league/worker.ts';
 
@@ -17,6 +17,7 @@ const { values } = parseArgs({
     seeds: { type: 'string', default: '4' },
     from: { type: 'string', default: '100' },
     ticks: { type: 'string', default: '1200' },
+    resume: { type: 'string', default: '' },
     workers: { type: 'string', default: String(Math.max(1, Math.floor(cpus().length / 2) - 2)) },
   },
 });
@@ -27,20 +28,25 @@ const pool = list(values.pool);
 for (const n of [...players, ...pool]) kindOf(n);
 const seeds = Array.from({ length: Number(values.seeds) }, (_, i) => Number(values.from) + i);
 const ticks = Number(values.ticks);
-const todo: Job[] = jobs(trios(players, pool), seeds);
+const earlier: PackRecord[] = values.resume && existsSync(values.resume) ? readRecords(readFileSync(values.resume, 'utf8')) : [];
+const todo: Job[] = pending(jobs(trios(players, pool), seeds), earlier);
 const width = Math.min(Number(values.workers), todo.length);
 const log = (line: string): void => {
   process.stdout.write(line + '\n');
 };
 
 mkdirSync('league', { recursive: true });
-const file = 'league/' + new Date().toISOString().replace(/[:.]/g, '-') + '.ndjson';
-writeFileSync(file, '');
-log('ліга: ' + todo.length + ' пакетів, ' + width + ' працівників, тактів ' + ticks + ', записи: ' + file);
+const file = values.resume || 'league/' + new Date().toISOString().replace(/[:.]/g, '-') + '.ndjson';
+if (!values.resume) writeFileSync(file, '');
+log('ліга: ' + todo.length + ' пакетів (уже зіграно ' + earlier.length + '), ' + width + ' працівників, тактів ' + ticks + ', записи: ' + file);
 
 function runAll(): Promise<PackRecord[]> {
   return new Promise((done) => {
-    const records: PackRecord[] = [];
+    const records: PackRecord[] = [...earlier];
+    if (todo.length === 0) {
+      done(records);
+      return;
+    }
     let next = 0;
     let finished = 0;
     let failed = 0;

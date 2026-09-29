@@ -29,3 +29,8 @@ export function trios(players: string[], pool: string[]): Trio[] {
 export function jobs(ts: Trio[], seeds: number[]): Job[] {
   return ts.flatMap((cast) => seeds.map((seed) => ({ seed, cast })));
 }
+
+export function pending(all: Job[], done: { seed: number; cast: Trio }[]): Job[] {
+  const seen = new Set(done.map((d) => d.seed + '|' + d.cast.join('|')));
+  return all.filter((j) => !seen.has(j.seed + '|' + j.cast.join('|')));
+}

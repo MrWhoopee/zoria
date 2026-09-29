@@ -63,3 +63,10 @@ test('report lists standings and head to head for players', async () => {
   assert.ok(lines.some((l) => l.startsWith('основний [preset]')));
   assert.ok(lines.some((l) => l.includes('рівний') && l.includes('+3.00')));
 });
+
+test('pending skips packs already played', async () => {
+  const { pending } = await import('../tools/league/jobs.ts');
+  const all = jobs([['a', 'b', 'p'], ['a', 'c', 'p']], [1, 2]);
+  const left = pending(all, [{ seed: 1, cast: ['a', 'b', 'p'] }, { seed: 2, cast: ['a', 'c', 'p'] }]);
+  assert.deepEqual(left.map((j) => j.seed + j.cast.join('')), ['2abp', '1acp']);
+});
