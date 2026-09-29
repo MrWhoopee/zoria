@@ -61,8 +61,8 @@ export class Brain {
       cap: orderCap(v.cfg as unknown as ChannelCfg, w.chanAt),
       energy: w.energy,
     });
-    const alive = keepalive(this.ctx);
-    if (alive && !chosen.some((t) => t.unit !== null && t.unit === alive.unit)) chosen.push(alive);
+    const alive = keepalive(this.ctx, chosen);
+    if (alive) chosen.push(alive);
     for (const t of chosen) t.commit(this.memo, w.t);
     this.sent = chosen;
     this.sentAt = w.t;

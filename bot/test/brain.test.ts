@@ -66,3 +66,17 @@ test('the default brain orders a Tkach on the first tick', () => {
   const orders = b.tick(makeObs({ t: 1, mine: { ...makeObs().mine, needles: starts } }));
   assert.deepEqual(orders, [{ kind: 'yard', cls: 'ткач' }]);
 });
+
+test('keep-alive falls back to a watch when the idle unit already got a refused order', () => {
+  const b = brainWith([(ctx) => ctx.w.units.map((u) => ({ tag: 'x', unit: u.id, order: { kind: 'feed', unit: u.id, q: 7, r: 5 }, value: 1, bytes: 32, hands: 32, energy: 0, commit: () => undefined, refused: () => undefined }))]);
+  let silent = 0;
+  let worst = 0;
+  for (let t = 1; t <= 20; t++) {
+    const orders = b.tick(makeObs({ t, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
+    const ok = orders.some((o) => o.kind === 'watch');
+    silent = ok ? 0 : silent + 1;
+    worst = Math.max(worst, silent);
+    b.feedback(orders.map((o, i) => [i, o.kind === 'watch', o.kind === 'watch' ? 0 : 13]));
+  }
+  assert.ok(worst < 6, 'silent run ' + worst);
+});
