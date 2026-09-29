@@ -1,66 +1,47 @@
-/* bot :: strategy
-   ТУТ ВАША СТРАТЕГІЯ - єдиний файл шаблону, який мусить стати вашим.
-
-   Заглушка - дзеркальна голова архетипу SDK: вона грає, але своїх правил у
-   неї немає; списуйте з неї контракт, а не тактику. Контракт - WireBot
-   (маніфест, кадр спостереження -> кадр команд, вердикти) плюс кадр
-   щоденника віри. Архетип заглушки - ZARIA_PRESET (рівний, шир, обхідник,
-   проривник, облягач).
-
-   Свою голову починають із BlankBot з @zoria/sdk:
-
-     class MyBot extends BlankBot {
-       protected override think(obs: Observe): Order[] { ... }
-     }
-
-   і повертають її з createStrategy(); belief() без дзеркала збирає
-   BeliefFrame сам або віддає null. Мережі тут немає і бути не повинно:
-   провід, повернення і піни живуть у main.ts і connectBot. */
-
 import { createEngine } from '@zoria/engine';
-import { ARCHETYPES, BeliefTrace, sampleBot } from '@zoria/sdk';
-import type { BeliefFrame, MirrorBot, WireBot } from '@zoria/sdk';
+import { RulesOracle } from '@zoria/sdk';
+import type { BeliefFrame, WireBot } from '@zoria/sdk';
+import { decodeManifest, decodeObserve, decodeVerdicts, encodeOrders } from '@zoria/protocol';
 import type { Observe, SlotName } from '@zoria/protocol';
+import { beliefFrame } from './belief.ts';
+import { Brain } from './brain.ts';
+import { Links } from './map/links.ts';
+import { buildValley } from './map/valley.ts';
 
 export interface Strategy extends WireBot {
-  /* кадр щоденника віри такту; null - кадру немає */
   belief(obs: Observe | null): BeliefFrame | null;
 }
 
-class MirrorStrategy implements Strategy {
-  private head: MirrorBot;
-  private trace: BeliefTrace | null = null;
-
-  constructor(preset: string) {
-    this.head = sampleBot(createEngine, preset);
-  }
+class BrainStrategy implements Strategy {
+  private brain: Brain | null = null;
 
   init(manifest: Uint8Array, slot: SlotName): void {
-    this.head.init(manifest, slot);
-    this.trace = new BeliefTrace(slot);
+    const m = decodeManifest(manifest);
+    if (!m) throw new Error('manifest did not decode');
+    const v = buildValley(m, slot);
+    this.brain = new Brain(v, new Links(new RulesOracle(createEngine, manifest), v));
   }
 
   tick(observe: Uint8Array): Uint8Array {
-    return this.head.tick(observe);
+    const obs = decodeObserve(observe);
+    if (!obs || !this.brain) return encodeOrders([]);
+    return encodeOrders(this.brain.tick(obs));
   }
 
   feedback(verdicts: Uint8Array): void {
-    this.head.feedback(verdicts);
+    const v = decodeVerdicts(verdicts);
+    if (v && this.brain) this.brain.feedback(v);
   }
 
-  /* віра дзеркала: світ дзеркальної голови і є те, у що вона вірить */
   belief(obs: Observe | null): BeliefFrame | null {
-    const E = this.head.mirror();
-    return this.trace && E ? this.trace.frame(E, obs) : null;
+    return this.brain ? beliefFrame(this.brain.world, obs) : null;
   }
 }
 
-/* імена архетипів заглушки: за ними службова ручка зміни пресета вирішує,
-   є такий пресет чи ні. Своя голова повертає тут свої імена */
 export function presets(): string[] {
-  return Object.keys(ARCHETYPES);
+  return ['основний'];
 }
 
-export function createStrategy(preset = process.env['ZARIA_PRESET'] || 'рівний'): Strategy {
-  return new MirrorStrategy(preset);
+export function createStrategy(_preset = 'основний'): Strategy {
+  return new BrainStrategy();
 }
