@@ -5,11 +5,13 @@ import { decodeManifest, decodeObserve, decodeVerdicts, encodeOrders } from '@zo
 import type { Observe, SlotName } from '@zoria/protocol';
 import { beliefFrame } from './belief.ts';
 import { Brain } from './brain.ts';
+import type { BrainStats } from './brain.ts';
 import { Links } from './map/links.ts';
 import { buildValley } from './map/valley.ts';
 
 export interface Strategy extends WireBot {
   belief(obs: Observe | null): BeliefFrame | null;
+  stats(): BrainStats | null;
 }
 
 class BrainStrategy implements Strategy {
@@ -35,6 +37,10 @@ class BrainStrategy implements Strategy {
 
   belief(obs: Observe | null): BeliefFrame | null {
     return this.brain ? beliefFrame(this.brain.world, obs) : null;
+  }
+
+  stats(): BrainStats | null {
+    return this.brain ? { ...this.brain.stats } : null;
   }
 }
 

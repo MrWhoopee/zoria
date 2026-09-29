@@ -62,6 +62,7 @@ const head: Head = {
 };
 
 const server = statusPort ? statusServer(head) : null;
+if (server) server.on('error', (e) => log('службовий порт недоступний: ' + errText(e)));
 if (server) server.listen(statusPort, env['STATUS_HOST'] || '0.0.0.0', () => log('службовий порт ' + statusPort));
 
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
@@ -73,6 +74,7 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
 }
 
 const think: number[] = [];
+let beliefErrors = 0;
 
 const bot: WireBot = {
   init(manifest, slot) {
@@ -83,11 +85,15 @@ const bot: WireBot = {
     const t0 = performance.now();
     const out = strategy.tick(observe);
     if (beliefFile) {
-      const frame = strategy.belief(decodeObserve(observe));
-      if (frame) {
-        appendFileSync(beliefFile, beliefLine(frame));
-        beliefFrames++;
-        beliefAt = Date.now();
+      try {
+        const frame = strategy.belief(decodeObserve(observe));
+        if (frame) {
+          appendFileSync(beliefFile, beliefLine(frame));
+          beliefFrames++;
+          beliefAt = Date.now();
+        }
+      } catch (e) {
+        if (beliefErrors++ === 0) log('щоденник віри не записано: ' + errText(e));
       }
     }
     think.push(performance.now() - t0);
@@ -149,6 +155,8 @@ if (!url || !token) {
         ', max ' +
         q(100),
     );
+    const st = strategy.stats();
+    if (st) log('радники: помилок ' + st.errors + (st.lastError ? ' (' + st.lastError + ')' : '') + ', пропусків за часом ' + st.skipped + ', щоденник: збоїв ' + beliefErrors);
     if (!server) process.exit(0);
   }
 }

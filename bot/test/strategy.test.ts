@@ -19,3 +19,10 @@ test('presets name our single head', () => {
 test('init rejects a broken manifest', () => {
   assert.throws(() => createStrategy().init(new Uint8Array([0]), 'A'));
 });
+
+test('brain stats are exposed after init', () => {
+  const s = createStrategy();
+  assert.equal(s.stats(), null);
+  s.init(manifestBytes(), 'A');
+  assert.deepEqual(s.stats(), { errors: 0, lastError: '', skipped: 0 });
+});
