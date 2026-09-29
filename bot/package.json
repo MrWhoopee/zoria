@@ -1,0 +1,34 @@
+{
+  "name": "zaria-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Бот Зорі",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/main.js",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "play": "npm run build && zaria-kit pack",
+    "train": "npm run build && zaria-kit pack --fast --packs 8 --seed 100",
+    "lint:nakaz": "zaria-kit lint nakaz.yaml",
+    "check": "npm run build && npm test && zaria-kit lint nakaz.yaml"
+  },
+  "zaria": {
+    "bot": "node dist/main.js",
+    "lang": "uk"
+  },
+  "dependencies": {
+    "@zoria/engine": "^1.0.1",
+    "@zoria/nakaz": "^1.0.1",
+    "@zoria/protocol": "^1.0.1",
+    "@zoria/sdk": "^1.0.1"
+  },
+  "devDependencies": {
+    "@zoria/kit": "^1.0.1",
+    "@types/node": "24.3.0",
+    "typescript": "7.0.2"
+  }
+}
