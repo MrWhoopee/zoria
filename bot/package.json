@@ -16,7 +16,8 @@
     "lint:nakaz": "zaria-kit lint nakaz.yaml",
     "check": "npm run build && npm test && zaria-kit lint nakaz.yaml",
     "typecheck": "tsc -p tsconfig.check.json",
-    "league": "node tools/league.ts"
+    "league": "node tools/league.ts",
+    "replay": "node tools/replay.ts"
   },
   "zaria": {
     "bot": "node dist/main.js",
