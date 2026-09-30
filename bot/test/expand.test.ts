@@ -38,7 +38,7 @@ test('two Tkachs never share a target and commit reserves it', () => {
 });
 
 test('a Tkach mid-step gets no order', () => {
-  const ctx = ctxOf('B', makeObs({ t: 30, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6, { wait: 1 })] } }));
+  const ctx = ctxOf('B', makeObs({ t: 30, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6, { wait: 1, task: { goal: null, site: null, feed: null, jam: null, ram: null, home: false, path: 3 } })] } }));
   assert.equal(expand(ctx).length, 0);
 });
 
@@ -234,4 +234,9 @@ test('the leash counts the walk home', () => {
   assert.equal(expand(far)[0]?.tag, 'expand:home');
   const near = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 8, 8, { away: 22 })] } }));
   assert.ok(expand(near).every((t) => t.tag !== 'expand:home'));
+});
+
+test('a Tkach with leftover wait but no task can take an order', () => {
+  const ctx = ctxOf('B', makeObs({ t: 30, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6, { wait: 2 })] } }));
+  assert.equal(expand(ctx).length, 1);
 });

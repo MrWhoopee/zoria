@@ -56,3 +56,7 @@ export function bytesFor(ctx: Ctx, kind: OrderKind, at: Cell): number {
 export function weightOf(v: Valley, units: MineUnit[]): number {
   return units.reduce((s, u) => s + cfg(v, u.cls === 'ткач' ? 'weightTkach' : 'weightKlinok'), 0);
 }
+
+export function midStep(u: MineUnit): boolean {
+  return u.wait > 0 && u.task !== null && u.task.path > 0;
+}

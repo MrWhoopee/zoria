@@ -5,7 +5,7 @@ import { gain, pullOf, takeGain } from '../map/coverage.ts';
 import type { Pull } from '../map/coverage.ts';
 import { travelField } from '../map/travel.ts';
 import { cfg, inside, price, typeAt } from '../map/valley.ts';
-import { bytesFor } from './types.ts';
+import { bytesFor, midStep } from './types.ts';
 import type { Ctx, Reservation, Task } from './types.ts';
 
 export const RESERVE_TTL = 200;
@@ -222,7 +222,7 @@ export function expand(ctx: Ctx): Task[] {
   const lit = w.ownLit();
   const anchors = [v.base, ...lit];
   const tasks: Task[] = [];
-  const ready = w.units.filter((u) => u.cls === 'ткач' && u.wait === 0 && !u.stuck).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const ready = w.units.filter((u) => u.cls === 'ткач' && !midStep(u) && !u.stuck).sort((a, b) => (a.id < b.id ? -1 : 1));
   const leashed = new Set<string>();
   for (const u of ready) {
     overstayed(ctx, u);
