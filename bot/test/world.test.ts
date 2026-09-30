@@ -133,3 +133,16 @@ test('world remembers where each foe stood on the previous tick', () => {
   w.update(makeObs({ t: 12, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 4 }] }));
   assert.equal(w.stillFoe('T-A3'), false);
 });
+
+test('world counts how long a foe has stood still', () => {
+  const w = new World(valleyOf('B'));
+  const at = (t: number, q: number) => makeObs({ t, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q, r: 3 }] });
+  w.update(at(10, 9));
+  assert.equal(w.stillFor('T-A3'), 0);
+  w.update(at(11, 9));
+  w.update(at(12, 9));
+  assert.equal(w.stillFor('T-A3'), 2);
+  w.update(at(13, 8));
+  assert.equal(w.stillFor('T-A3'), 0);
+  assert.equal(w.stillFor('nobody'), 0);
+});

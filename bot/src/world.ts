@@ -23,7 +23,7 @@ export class World {
   seen = new Map<string, number>();
   since = new Map<string, number>();
   private foeAt = new Map<string, string>();
-  private foeWas = new Map<string, string>();
+  private foeStill = new Map<string, number>();
 
   constructor(v: Valley) {
     this.v = v;
@@ -43,8 +43,15 @@ export class World {
     this.units = obs.mine.units;
     this.mine = obs.mine.needles;
     this.foe = obs.foe;
-    this.foeWas = this.foeAt;
-    this.foeAt = new Map(obs.foe.map((f) => [f.id, key(f.q, f.r)]));
+    const still = new Map<string, number>();
+    const at = new Map<string, string>();
+    for (const f of obs.foe) {
+      const k = key(f.q, f.r);
+      at.set(f.id, k);
+      still.set(f.id, this.foeAt.get(f.id) === k ? (this.foeStill.get(f.id) ?? 0) + 1 : 0);
+    }
+    this.foeAt = at;
+    this.foeStill = still;
     this.order = obs.pub.order;
     this.hold = obs.mine.order;
     for (const e of obs.own) {
@@ -75,9 +82,12 @@ export class World {
     }
   }
 
+  stillFor(id: string): number {
+    return this.foeStill.get(id) ?? 0;
+  }
+
   stillFoe(id: string): boolean {
-    const now = this.foeAt.get(id);
-    return now !== undefined && now === this.foeWas.get(id);
+    return this.stillFor(id) > 0;
   }
 
   ownLit(): Cell[] {

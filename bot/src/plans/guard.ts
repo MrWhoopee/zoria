@@ -7,6 +7,7 @@ import type { Ctx, Task } from './types.ts';
 
 export const GUARD_VALUE = 5e4;
 export const POST_SLACK = 2;
+export const RAM_MARGIN = 2;
 
 const none = (): void => undefined;
 
@@ -43,7 +44,9 @@ export function guard(ctx: Ctx): Task[] {
   const tasks: Task[] = [];
   const used = new Set<string>();
   for (const f of threats) {
-    const free = klinoks.filter((k) => !used.has(k.id) && !k.task?.ram).sort((a, b) => dist(a, f) - dist(b, f) || a.id.localeCompare(b.id));
+    const heat = cfg(v, w.dark.get(keyOf(f)) === true ? 'heatDark' : 'heatEnemy');
+    const inTime = (k: Cell): boolean => w.stillFor(f.id) + dist(k, f) + RAM_MARGIN < heat;
+    const free = klinoks.filter((k) => !used.has(k.id) && !k.task?.ram && inTime(k)).sort((a, b) => dist(a, f) - dist(b, f) || a.id.localeCompare(b.id));
     const k = free[0];
     if (!k) break;
     used.add(k.id);

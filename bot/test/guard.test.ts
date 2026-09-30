@@ -79,3 +79,15 @@ test('only a foe that stayed on a needle older than the capture grace is rammed'
   fresh.update(makeObs({ t: 101, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe }));
   assert.equal(guard({ ...ctx, w: fresh }).filter((t) => t.order.kind === 'ram').length, 0);
 });
+
+test('no ram when the Klinok would arrive as the heat completes', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 9, r: 3 }];
+  const base = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe });
+  const ctx = ctxOf('B', { ...base, t: 100, foe: [] });
+  for (let t = 180; t <= 200; t++) ctx.w.update({ ...base, t });
+  assert.equal(guard(ctx).filter((t) => t.order.kind === 'ram').length, 0);
+  const early = ctxOf('B', { ...base, t: 100, foe: [] });
+  for (let t = 195; t <= 200; t++) early.w.update({ ...base, t });
+  assert.equal(guard(early).filter((t) => t.order.kind === 'ram').length, 1);
+});
