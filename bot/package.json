@@ -18,7 +18,8 @@
     "typecheck": "tsc -p tsconfig.check.json",
     "league": "node tools/league.ts",
     "replay": "node tools/replay.ts",
-    "league:report": "node tools/league-report.ts"
+    "league:report": "node tools/league-report.ts",
+    "mutate": "node tools/mutate.ts"
   },
   "zaria": {
     "bot": "node dist/main.js",
