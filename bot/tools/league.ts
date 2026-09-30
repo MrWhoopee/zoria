@@ -30,7 +30,10 @@ const seeds = Array.from({ length: Number(values.seeds) }, (_, i) => Number(valu
 const ticks = Number(values.ticks);
 const earlier: PackRecord[] = values.resume && existsSync(values.resume) ? readRecords(readFileSync(values.resume, 'utf8')) : [];
 const todo: Job[] = pending(jobs(trios(players, pool), seeds), earlier);
-const width = Math.min(Number(values.workers), todo.length);
+for (const [name, raw] of [['seeds', values.seeds], ['from', values.from], ['ticks', values.ticks], ['workers', values.workers]] as const) {
+  if (!Number.isInteger(Number(raw)) || Number(raw) < 0) throw new Error('--' + name + ' must be a whole number, got ' + raw);
+}
+const width = Math.min(Math.max(1, Number(values.workers)), todo.length);
 const log = (line: string): void => {
   process.stdout.write(line + '\n');
 };
@@ -51,19 +54,30 @@ function runAll(): Promise<PackRecord[]> {
     let finished = 0;
     let failed = 0;
     const started = Date.now();
-    const feed = (w: Worker): void => {
-      const job = todo[next++];
-      if (!job) {
-        void w.terminate();
-        return;
+    const settle = (): void => {
+      finished++;
+      if (finished % Math.max(1, Math.floor(todo.length / 10)) === 0) log('  ' + finished + '/' + todo.length + ', ' + Math.round((Date.now() - started) / 1000) + ' с');
+      if (finished === todo.length) {
+        if (failed > 0) log('збоїв: ' + failed);
+        done(records);
       }
-      const msg: WorkerJob = { job, ticks };
-      w.postMessage(msg);
     };
-    for (let i = 0; i < width; i++) {
+    const spawn = (): void => {
       const w = new Worker(new URL('./league/worker.ts', import.meta.url));
+      let current: Job | null = null;
+      const feed = (): void => {
+        const job = todo[next++];
+        if (!job) {
+          current = null;
+          w.terminate().catch((e: unknown) => log('працівник не зупинився: ' + String(e)));
+          return;
+        }
+        current = job;
+        const msg: WorkerJob = { job, ticks };
+        w.postMessage(msg);
+      };
       w.on('message', (reply: WorkerReply) => {
-        finished++;
+        current = null;
         if (reply.ok) {
           records.push(reply.record);
           appendFileSync(file, JSON.stringify(reply.record) + '\n');
@@ -71,18 +85,23 @@ function runAll(): Promise<PackRecord[]> {
           failed++;
           log('збій: ' + reply.job.cast.join(',') + ' жереб ' + reply.job.seed + ': ' + reply.error);
         }
-        if (finished % Math.max(1, Math.floor(todo.length / 10)) === 0) log('  ' + finished + '/' + todo.length + ', ' + Math.round((Date.now() - started) / 1000) + ' с');
-        if (finished === todo.length) {
-          if (failed > 0) log('збоїв: ' + failed);
-          done(records);
-        }
-        feed(w);
+        settle();
+        feed();
       });
       w.on('error', (e) => {
         log('працівник упав: ' + e.message);
       });
-      feed(w);
-    }
+      w.on('exit', () => {
+        if (current === null) return;
+        failed++;
+        log('пакет втрачено: ' + current.cast.join(',') + ' жереб ' + current.seed);
+        current = null;
+        settle();
+        if (next < todo.length) spawn();
+      });
+      feed();
+    };
+    for (let i = 0; i < width; i++) spawn();
   });
 }
 
