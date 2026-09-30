@@ -51,6 +51,6 @@ test('with the Tkachs in place the yard adds a Klinok', () => {
   const tasks = yard(ctxOf('B', makeObs({ pulse: { ...makeObs().pulse, energy: 60 }, mine: { ...makeObs().mine, units } })));
   assert.deepEqual(tasks[0]?.order, { kind: 'yard', cls: 'клинок' });
   assert.equal(tasks[0]?.energy, 50);
-  const withK = [...units, { ...tkach('K-B4', 6, 6), cls: 'клинок' as const }];
+  const withK = [...units, { ...tkach('K-B4', 6, 6), cls: 'клинок' as const }, { ...tkach('K-B5', 7, 6), cls: 'клинок' as const }];
   assert.equal(yard(ctxOf('B', makeObs({ pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units: withK } }))).length, 0);
 });

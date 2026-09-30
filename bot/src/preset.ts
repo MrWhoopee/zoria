@@ -11,13 +11,14 @@ export interface Preset {
   klinokTarget: number;
 }
 
-const BASE: Preset = { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 1 };
+const BASE: Preset = { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2 };
 
 export const PRESETS: Record<string, Preset> = {
   основний: BASE,
   широкий: { ...BASE, name: 'широкий', tkachTarget: 4, etaPower: 0.8 },
   ближній: { ...BASE, name: 'ближній', etaPower: 1.5 },
   скупий: { ...BASE, name: 'скупий', tkachTarget: 2, buildReserve: 60 },
+  варта: { ...BASE, name: 'варта', tkachTarget: 2, klinokTarget: 4 },
 };
 
 type Knob = Exclude<keyof Preset, 'name'>;
