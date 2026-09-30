@@ -42,3 +42,20 @@ export function gain(v: Valley, site: Cell, own: Pull, foe: Pull, mult = 1): num
   }
   return total;
 }
+
+export function takeGain(v: Valley, site: Cell, own: Pull, foe: Pull, foeMult: number, harm: number): number {
+  let total = 0;
+  for (const c of disc(site, v.rings.length - 1)) {
+    const cost = price(v, c);
+    if (cost === 0) continue;
+    const k = keyOf(c);
+    const ring = v.rings[dist(c, site)] ?? 0;
+    const o = own.get(k) ?? 0;
+    const f = foe.get(k) ?? 0;
+    const f2 = Math.max(0, f - ring * foeMult);
+    const ours = share(o + ring, f2) - share(o, f);
+    const theirs = share(f, o) - share(f2, o + ring);
+    total += cost * (ours + harm * theirs);
+  }
+  return total;
+}

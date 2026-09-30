@@ -68,7 +68,7 @@ test('the default brain orders a Tkach on the first tick', () => {
 });
 
 test('keep-alive falls back to a watch when the idle unit already got a refused order', () => {
-  const b = brainWith([(ctx) => ctx.w.units.map((u) => ({ tag: 'x', unit: u.id, order: { kind: 'feed', unit: u.id, q: 7, r: 5 }, value: 1, bytes: 32, hands: 32, energy: 0, commit: () => undefined, refused: () => undefined }))]);
+  const b = brainWith([(ctx) => ctx.w.units.map((u) => ({ tag: 'x', unit: u.id, order: { kind: 'feed', unit: u.id, q: 7, r: 5 }, value: 1, bytes: 32, energy: 0, commit: () => undefined, refused: () => undefined }))]);
   let silent = 0;
   let worst = 0;
   for (let t = 1; t <= 20; t++) {

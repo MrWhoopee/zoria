@@ -1,11 +1,11 @@
 import { performance } from 'node:perf_hooks';
 import { orderCap } from '@zoria/protocol';
 import type { ChannelCfg, Observe, Order, Verdict } from '@zoria/protocol';
-import { allocate, busyHands } from './allocate.ts';
+import { allocate } from './allocate.ts';
 import type { Links } from './map/links.ts';
-import { cfg } from './map/valley.ts';
 import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
+import { guard } from './plans/guard.ts';
 import { keepalive } from './plans/keepalive.ts';
 import { newMemo } from './plans/types.ts';
 import { presetOf } from './preset.ts';
@@ -32,7 +32,7 @@ export class Brain {
   private sent: Task[] = [];
   private sentAt = 0;
 
-  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, expand], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
+  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
     this.world = new World(v);
     this.ctx = { v, w: this.world, links, memo: this.memo, preset };
     this.advisors = advisors;
@@ -59,7 +59,6 @@ export class Brain {
     const v = this.ctx.v;
     const chosen = allocate(tasks, {
       chan: w.chan,
-      busyHands: busyHands(w.units, cfg(v, 'chanTick')),
       cap: orderCap(v.cfg as unknown as ChannelCfg, w.chanAt),
       energy: w.energy,
     });
