@@ -24,7 +24,7 @@ const decisionsFile = env['ZARIA_DECISIONS'] || (beliefFile ? beliefFile.replace
 const statusPort = Number(env['STATUS_PORT'] ?? '') || 0;
 const freeze = env['ZARIA_FREEZE'] === '1';
 
-let preset = env['ZARIA_PRESET'] || 'основний';
+let preset = env['ZARIA_PRESET'] || 'глушій';
 let strategy = createStrategy(preset);
 
 let phase: 'lobby' | 'live' | 'done' = 'lobby';

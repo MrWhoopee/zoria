@@ -52,6 +52,7 @@ test('preset values are pinned', () => {
   assert.equal(PRESETS['ближній']?.etaPower, 1.5);
   assert.deepEqual([PRESETS['скупий']?.tkachTarget, PRESETS['скупий']?.buildReserve], [2, 60]);
   assert.deepEqual([PRESETS['варта']?.tkachTarget, PRESETS['варта']?.klinokTarget], [2, 4]);
+  assert.deepEqual(PRESETS['глушій'], { ...PRESETS['варта'], name: 'глушій', jam: 1, jamHome: 0, jamLeader: 3 });
 });
 
 test('every malformed knob is refused with its text', () => {
