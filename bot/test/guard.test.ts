@@ -116,8 +116,10 @@ test('by default the guard rams any foe standing on a needle we could lose', () 
 test('a foe Klinok next to a dark needle of ours is rammed as a jammer', () => {
   const needles = [...starts, { q: 9, r: 3, dark: true, fed: false, weight: 0 }];
   const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'K-C4', p: 'C', cls: 'клинок', q: 10, r: 3 }] });
-  assert.deepEqual(guard(ctxOf('B', obs)).find((t) => t.order.kind === 'ram')?.order, { kind: 'ram', unit: 'K-B7', target: 'K-C4' });
+  const jam = presetOf('основний+ramJammers=1');
+  assert.equal(guard(ctxOf('B', obs)).filter((t) => t.order.kind === 'ram').length, 0);
+  assert.deepEqual(guard(ctxOf('B', obs, 2026, jam)).find((t) => t.order.kind === 'ram')?.order, { kind: 'ram', unit: 'K-B7', target: 'K-C4' });
   const lit = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
   const calm = makeObs({ t: 200, mine: { ...makeObs().mine, needles: lit, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'K-C4', p: 'C', cls: 'клинок', q: 10, r: 3 }] });
-  assert.equal(guard(ctxOf('B', calm)).filter((t) => t.order.kind === 'ram').length, 0);
+  assert.equal(guard(ctxOf('B', calm, 2026, jam)).filter((t) => t.order.kind === 'ram').length, 0);
 });
