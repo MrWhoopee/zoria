@@ -47,7 +47,7 @@ test('preset names accept knob overrides', () => {
 });
 
 test('preset values are pinned', () => {
-  assert.deepEqual(PRESETS['основний'], { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2, contract: 1, dawnPrep: 1, ramGrace: 1, ramStill: 1, ramTiming: 1, chaseOff: 1 });
+  assert.deepEqual(PRESETS['основний'], { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2, contract: 1, dawnPrep: 1, ramGrace: 0, ramStill: 0, ramTiming: 0, chaseOff: 0 });
   assert.deepEqual([PRESETS['широкий']?.tkachTarget, PRESETS['широкий']?.etaPower], [4, 0.8]);
   assert.equal(PRESETS['ближній']?.etaPower, 1.5);
   assert.deepEqual([PRESETS['скупий']?.tkachTarget, PRESETS['скупий']?.buildReserve], [2, 60]);

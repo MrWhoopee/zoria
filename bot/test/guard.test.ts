@@ -2,13 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { MineUnit } from '@zoria/protocol';
 import { guard } from '../src/plans/guard.ts';
+import { presetOf } from '../src/preset.ts';
+
+const strict = presetOf('основний+ramGrace=1+ramStill=1+ramTiming=1+chaseOff=1');
 import { ctxOf } from './ctx.ts';
 import { makeObs, tkach } from './obs.ts';
 
 const starts = [{ q: 7, r: 5, dark: false, fed: false, weight: 1 }, { q: 5, r: 7, dark: false, fed: false, weight: 1 }];
 
-function settled(obs: ReturnType<typeof makeObs>): ReturnType<typeof ctxOf> {
-  const ctx = ctxOf('B', { ...obs, t: obs.t - 100, foe: [] });
+function settled(obs: ReturnType<typeof makeObs>, preset = strict): ReturnType<typeof ctxOf> {
+  const ctx = ctxOf('B', { ...obs, t: obs.t - 100, foe: [] }, 2026, preset);
   ctx.w.update({ ...obs, t: obs.t - 1 });
   ctx.w.update(obs);
   return ctx;
@@ -73,7 +76,7 @@ test('only a foe that stayed on a needle older than the capture grace is rammed'
   const { World } = await import('../src/world.ts');
   const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
   const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 9, r: 3 }];
-  const ctx = ctxOf('B', makeObs({ t: 100, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe }));
+  const ctx = ctxOf('B', makeObs({ t: 100, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe }), 2026, strict);
   const fresh = new World(ctx.v);
   fresh.update(makeObs({ t: 99, mine: { ...makeObs().mine, needles: starts } }));
   fresh.update(makeObs({ t: 100, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe }));
@@ -85,10 +88,10 @@ test('no ram when the Klinok would arrive as the heat completes', () => {
   const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
   const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 9, r: 3 }];
   const base = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe });
-  const ctx = ctxOf('B', { ...base, t: 100, foe: [] });
+  const ctx = ctxOf('B', { ...base, t: 100, foe: [] }, 2026, strict);
   for (let t = 180; t <= 200; t++) ctx.w.update({ ...base, t });
   assert.equal(guard(ctx).filter((t) => t.order.kind === 'ram').length, 0);
-  const early = ctxOf('B', { ...base, t: 100, foe: [] });
+  const early = ctxOf('B', { ...base, t: 100, foe: [] }, 2026, strict);
   for (let t = 195; t <= 200; t++) early.w.update({ ...base, t });
   assert.equal(guard(early).filter((t) => t.order.kind === 'ram').length, 1);
 });
@@ -102,4 +105,10 @@ test('a chase is called off when the foe leaves our needle', () => {
   assert.deepEqual(guard(settled(gone)).map((t) => t.order), [{ kind: 'halt', unit: 'K-B7' }]);
   const heating = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 7, 4, { task: chase })] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] });
   assert.equal(guard(settled(heating)).length, 0);
+});
+
+test('by default the guard rams any foe standing on a needle we could lose', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] });
+  assert.equal(guard(ctxOf('B', obs)).filter((t) => t.order.kind === 'ram').length, 1);
 });
