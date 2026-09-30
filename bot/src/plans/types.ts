@@ -1,5 +1,5 @@
 import { orderCost } from '@zoria/protocol';
-import type { ActorName, ChannelCfg, MineUnit, Order, OrderKind } from '@zoria/protocol';
+import type { ActorName, ChannelCfg, ClsName, MineUnit, Order, OrderKind } from '@zoria/protocol';
 import type { Cell } from '../hex.ts';
 import type { Links } from '../map/links.ts';
 import type { Preset } from '../preset.ts';
@@ -19,7 +19,7 @@ export interface Reservation {
 
 export interface Memo {
   res: Map<string, Reservation>;
-  pendingYard: number[];
+  pendingYard: { cls: ClsName; eta: number }[];
   lastAccepted: number;
   banned: Map<string, number>;
 }

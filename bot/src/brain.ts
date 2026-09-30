@@ -5,6 +5,7 @@ import { allocate } from './allocate.ts';
 import type { Links } from './map/links.ts';
 import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
+import { guard } from './plans/guard.ts';
 import { keepalive } from './plans/keepalive.ts';
 import { newMemo } from './plans/types.ts';
 import { presetOf } from './preset.ts';
@@ -31,7 +32,7 @@ export class Brain {
   private sent: Task[] = [];
   private sentAt = 0;
 
-  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, expand], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
+  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
     this.world = new World(v);
     this.ctx = { v, w: this.world, links, memo: this.memo, preset };
     this.advisors = advisors;
