@@ -3,6 +3,7 @@ import { orderCap } from '@zoria/protocol';
 import type { ChannelCfg, Observe, Order, Verdict } from '@zoria/protocol';
 import { allocate } from './allocate.ts';
 import type { Links } from './map/links.ts';
+import { cfg } from './map/valley.ts';
 import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
 import { guard } from './plans/guard.ts';
@@ -61,6 +62,7 @@ export class Brain {
       chan: w.chan,
       cap: orderCap(v.cfg as unknown as ChannelCfg, w.chanAt),
       energy: w.energy,
+      reserve: w.units.filter((u) => u.task !== null).length * cfg(v, 'chanTick'),
     });
     const alive = keepalive(this.ctx, chosen);
     if (alive) chosen.push(alive);

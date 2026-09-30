@@ -4,7 +4,10 @@ export interface Budget {
   chan: number;
   cap: number;
   energy: number;
+  reserve: number;
 }
+
+export const LOW_VALUE = 1;
 
 export function allocate(tasks: Task[], b: Budget): Task[] {
   let chan = b.chan;
@@ -15,6 +18,7 @@ export function allocate(tasks: Task[], b: Budget): Task[] {
     if (out.length >= b.cap) break;
     if (task.unit !== null && used.has(task.unit)) continue;
     if (task.bytes > chan || task.energy > energy) continue;
+    if (task.value < LOW_VALUE && chan - task.bytes < b.reserve) continue;
     chan -= task.bytes;
     energy -= task.energy;
     if (task.unit !== null) used.add(task.unit);

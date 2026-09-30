@@ -8,13 +8,14 @@ import type { Valley } from '../map/valley.ts';
 import type { World } from '../world.ts';
 
 export interface Reservation {
-  kind: 'take' | 'build' | 'feed' | 'home';
+  kind: 'take' | 'build' | 'feed' | 'home' | 'stage';
   cell: Cell;
   since: number;
   sent: number;
   owner?: ActorName | null;
   work?: number;
   arrived?: number;
+  muted?: number;
 }
 
 export interface Memo {
