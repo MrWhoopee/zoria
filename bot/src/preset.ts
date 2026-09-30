@@ -10,9 +10,10 @@ export interface Preset {
   repair: number;
   klinokTarget: number;
   contract: number;
+  dawnPrep: number;
 }
 
-const BASE: Preset = { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2, contract: 1 };
+const BASE: Preset = { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2, contract: 1, dawnPrep: 1 };
 
 export const PRESETS: Record<string, Preset> = {
   основний: BASE,
@@ -24,7 +25,7 @@ export const PRESETS: Record<string, Preset> = {
 
 type Knob = Exclude<keyof Preset, 'name'>;
 
-const KNOBS: readonly Knob[] = ['tkachTarget', 'buildReserve', 'etaPower', 'feed', 'harm', 'unlock', 'steal', 'repair', 'klinokTarget', 'contract'];
+const KNOBS: readonly Knob[] = ['tkachTarget', 'buildReserve', 'etaPower', 'feed', 'harm', 'unlock', 'steal', 'repair', 'klinokTarget', 'contract', 'dawnPrep'];
 
 function isKnob(k: string): k is Knob {
   return (KNOBS as readonly string[]).includes(k);

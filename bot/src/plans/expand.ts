@@ -15,6 +15,8 @@ export const AWAY_LIMIT = 32;
 export const HEAT_SLACK = 12;
 export const BAN_TICKS = 80;
 export const REFUSE_BAN = 150;
+export const DAWN_PREP = 300;
+export const STAGE = 30;
 const BANNING = new Set([11, 12, 21]);
 
 export function banned(ctx: Ctx, k: string): boolean {
@@ -36,6 +38,10 @@ export function release(ctx: Ctx): void {
     const unit = alive.get(id);
     if (r.kind === 'home') {
       if (!unit || unit.away === 0) memo.res.delete(id);
+      continue;
+    }
+    if (r.kind === 'stage') {
+      if (!unit || w.t >= v.dawnAt) memo.res.delete(id);
       continue;
     }
     const o = w.owner.get(keyOf(r.cell));
@@ -62,6 +68,15 @@ export function unlockValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull, fo
     if (dist(r, site) > range || w.owner.get(keyOf(r)) !== null) continue;
     if (!links.ok(site, r) || links.reach(r, anchors)) continue;
     total += gain(v, r, own, foe);
+  }
+  const before = v.dawnAt - w.t;
+  if (ctx.preset.dawnPrep > 0 && before > 0 && before <= DAWN_PREP) {
+    const share = (v.ticks - v.dawnAt) / Math.max(1, v.ticks - w.t);
+    const mult = cfg(v, 'dawnRing');
+    for (const r of v.ring) {
+      if (dist(r, site) > range || !links.ok(site, r) || links.reach(r, anchors)) continue;
+      total += ctx.preset.dawnPrep * share * gain(v, r, own, foe, mult);
+    }
   }
   return total;
 }
@@ -108,7 +123,8 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
     const dark = keeper || w.dark.get(k) === true;
     const mult = dark ? 0 : 1;
     const work = keeper ? cfg(v, 'heatNeedle') : dark ? cfg(v, 'heatDark') : cfg(v, 'heatEnemy');
-    out.push({ cell: c, kind: 'take', gain: takeGain(v, c, own, foe, mult, preset.harm) + back(c), work, owner: o });
+    const value = keeper ? gain(v, c, own, foe, cfg(v, 'dawnRing')) : takeGain(v, c, own, foe, mult, preset.harm);
+    out.push({ cell: c, kind: 'take', gain: value + back(c), work, owner: o });
   }
   const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
   const need = cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0);
@@ -218,6 +234,22 @@ function overstayed(ctx: Ctx, u: MineUnit): void {
   memo.banned.set(keyOf(r.cell), w.t + BAN_TICKS);
 }
 
+function stageSpot(ctx: Ctx, u: MineUnit, anchors: Cell[], taken: Set<string>): Cell | null {
+  const { v, links } = ctx;
+  const rings = v.ring.filter((r) => !taken.has(keyOf(r)) && links.reach(r, anchors)).sort((a, b) => dist(a, u) - dist(b, u));
+  for (const ring of rings) {
+    const spots = disc(ring, 2)
+      .filter((c) => dist(c, v.citadel) === v.cherta + 1 && typeAt(v, c)?.pass === true && !taken.has(keyOf(c)))
+      .sort((a, b) => dist(a, ring) - dist(b, ring) || dist(a, u) - dist(b, u));
+    const spot = spots[0];
+    if (spot) {
+      taken.add(keyOf(ring));
+      return spot;
+    }
+  }
+  return null;
+}
+
 export function expand(ctx: Ctx): Task[] {
   const { v, w, memo } = ctx;
   release(ctx);
@@ -251,7 +283,16 @@ export function expand(ctx: Ctx): Task[] {
   const rate = cfg(v, 'minuteRate');
   const left = v.ticks - w.t;
   const taken = new Set<string>();
+  const staging = w.t >= v.dawnAt - STAGE && w.t < v.dawnAt;
   for (const u of free) {
+    if (staging) {
+      const spot = stageSpot(ctx, u, anchors, taken);
+      if (spot) {
+        taken.add(keyOf(spot));
+        tasks.push(taskFor(ctx, u, { kind: 'stage', cell: spot, owner: null, work: 0 }, 1e3, -1));
+        continue;
+      }
+    }
     const field = travelField(v, u, 'ткач');
     let best: Site | null = null;
     let bestScore = 0;
