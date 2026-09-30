@@ -104,3 +104,14 @@ test('the think limit is 300 ms of the 500 ms deadline', async () => {
   const { THINK_LIMIT_MS } = await import('../src/brain.ts');
   assert.equal(THINK_LIMIT_MS, 300);
 });
+
+test('the brain keeps a decision record for the last tick', () => {
+  const b = brainWith();
+  b.tick(makeObs({ t: 1, mine: { ...makeObs().mine, needles: starts } }));
+  const d = b.decisions();
+  assert.equal(d.t, 1);
+  assert.deepEqual(d.chosen.map((c) => [c.tag, c.unit, c.order.kind]), [['yard', null, 'yard']]);
+  assert.equal(d.chosen[0]?.value, 1e6);
+  assert.equal(d.offered, 1);
+  assert.deepEqual(d.errors, 0);
+});

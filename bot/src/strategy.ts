@@ -6,6 +6,7 @@ import type { Observe, SlotName } from '@zoria/protocol';
 import { beliefFrame } from './belief.ts';
 import { Brain } from './brain.ts';
 import type { BrainStats } from './brain.ts';
+import type { DecisionRecord } from './decisions.ts';
 import { Links } from './map/links.ts';
 import { buildValley } from './map/valley.ts';
 import { PRESETS, presetOf } from './preset.ts';
@@ -14,6 +15,7 @@ import type { Preset } from './preset.ts';
 export interface Strategy extends WireBot {
   belief(obs: Observe | null): BeliefFrame | null;
   stats(): BrainStats | null;
+  decisions(): DecisionRecord | null;
 }
 
 class BrainStrategy implements Strategy {
@@ -48,6 +50,10 @@ class BrainStrategy implements Strategy {
 
   stats(): BrainStats | null {
     return this.brain ? { ...this.brain.stats } : null;
+  }
+
+  decisions(): DecisionRecord | null {
+    return this.brain && this.brain.world.t > 0 ? this.brain.decisions() : null;
   }
 }
 

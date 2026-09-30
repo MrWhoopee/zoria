@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { orderCap } from '@zoria/protocol';
 import type { ChannelCfg, Observe, Order, Verdict } from '@zoria/protocol';
 import { allocate } from './allocate.ts';
+import type { DecisionRecord } from './decisions.ts';
 import type { Links } from './map/links.ts';
 import { cfg } from './map/valley.ts';
 import type { Valley } from './map/valley.ts';
@@ -32,6 +33,7 @@ export class Brain {
   private readonly clock: () => number;
   private sent: Task[] = [];
   private sentAt = 0;
+  private record: DecisionRecord = { t: 0, offered: 0, errors: 0, chosen: [] };
 
   constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
     this.world = new World(v);
@@ -42,6 +44,7 @@ export class Brain {
 
   tick(obs: Observe): Order[] {
     const t0 = this.clock();
+    const errorsBefore = this.stats.errors;
     this.world.update(obs);
     const tasks: Task[] = [];
     for (const advise of this.advisors) {
@@ -69,7 +72,12 @@ export class Brain {
     for (const t of chosen) t.commit(this.memo, w.t);
     this.sent = chosen;
     this.sentAt = w.t;
+    this.record = { t: w.t, offered: tasks.length, errors: this.stats.errors - errorsBefore, chosen: chosen.map((c) => ({ tag: c.tag, unit: c.unit, value: c.value, order: c.order })) };
     return chosen.map((t) => t.order);
+  }
+
+  decisions(): DecisionRecord {
+    return this.record;
   }
 
   feedback(verdicts: Verdict[]): void {

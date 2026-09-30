@@ -4,6 +4,7 @@ import { ENGINE_HASH } from '@zoria/engine';
 import { beliefLine, connectBot } from '@zoria/sdk';
 import type { BotRun, WireBot } from '@zoria/sdk';
 import { decodeObserve } from '@zoria/protocol';
+import { decisionLine } from './decisions.ts';
 import { withJitter } from './jitter.ts';
 import { createStrategy, presets } from './strategy.ts';
 import { Refusal, statusServer } from './status.ts';
@@ -19,6 +20,7 @@ const url = env['ZARIA_URL'] ?? '';
 const token = env['ZARIA_TOKEN'] ?? '';
 const engine = env['ZARIA_ENGINE'] || ENGINE_HASH;
 const beliefFile = env['ZARIA_BELIEF'] ?? '';
+const decisionsFile = env['ZARIA_DECISIONS'] || (beliefFile ? beliefFile.replace(/belief(-?\d*\.ndjson)$/, 'decisions$1') : '');
 const statusPort = Number(env['STATUS_PORT'] ?? '') || 0;
 const freeze = env['ZARIA_FREEZE'] === '1';
 
@@ -80,6 +82,7 @@ const bot: WireBot = {
   init(manifest, slot) {
     strategy.init(manifest, slot);
     if (beliefFile) writeFileSync(beliefFile, '');
+    if (decisionsFile && decisionsFile !== beliefFile) writeFileSync(decisionsFile, '');
   },
   tick(observe) {
     const t0 = performance.now();
@@ -94,6 +97,14 @@ const bot: WireBot = {
         }
       } catch (e) {
         if (beliefErrors++ === 0) log('щоденник віри не записано: ' + errText(e));
+      }
+    }
+    if (decisionsFile && decisionsFile !== beliefFile) {
+      try {
+        const record = strategy.decisions();
+        if (record) appendFileSync(decisionsFile, decisionLine(record));
+      } catch (e) {
+        if (beliefErrors++ === 0) log('журнал рішень не записано: ' + errText(e));
       }
     }
     think.push(performance.now() - t0);
