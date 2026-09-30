@@ -1,4 +1,4 @@
-import type { ActorName, FoeEntry, MineNeedle, MineUnit, Observe } from '@zoria/protocol';
+import type { ActorName, FoeEntry, MineNeedle, MineUnit, Observe, OrderBoard, OrderProgress } from '@zoria/protocol';
 import { key, keyOf, parse } from './hex.ts';
 import type { Cell } from './hex.ts';
 import type { Source } from './map/coverage.ts';
@@ -16,6 +16,8 @@ export class World {
   units: MineUnit[] = [];
   mine: MineNeedle[] = [];
   foe: FoeEntry[] = [];
+  order: OrderBoard | null = null;
+  hold: OrderProgress | null = null;
   owner = new Map<string, ActorName | null>();
   dark = new Map<string, boolean>();
   seen = new Map<string, number>();
@@ -38,6 +40,8 @@ export class World {
     this.units = obs.mine.units;
     this.mine = obs.mine.needles;
     this.foe = obs.foe;
+    this.order = obs.pub.order;
+    this.hold = obs.mine.order;
     for (const e of obs.own) {
       const k = key(e.q, e.r);
       this.owner.set(k, e.owner);

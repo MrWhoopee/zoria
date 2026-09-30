@@ -65,3 +65,14 @@ test('keeper ring pulls with the ring multiplier', () => {
   assert.equal(ringSources.length, 12);
   assert.equal(ringSources[0]?.mult, v.cfg['ringPull']);
 });
+
+test('update keeps the open contract and our hold progress', () => {
+  const w = new World(valleyOf('B'));
+  const board = { cells: [{ q: 1, r: 9 }, { q: 2, r: 9 }, { q: 3, r: 8 }] as [{ q: number; r: number }, { q: number; r: number }, { q: number; r: number }], from: 40, to: 130, bonus: 30, holdTicks: 12 };
+  w.update(makeObs({ t: 50, pub: { ...makeObs().pub, order: board }, mine: { ...makeObs().mine, order: { ticks: 3, reason: null, cell: null } } }));
+  assert.deepEqual(w.order, board);
+  assert.equal(w.hold?.ticks, 3);
+  w.update(makeObs({ t: 51 }));
+  assert.equal(w.order, null);
+  assert.equal(w.hold, null);
+});

@@ -5,6 +5,7 @@ import { gain, pullOf, takeGain } from '../map/coverage.ts';
 import type { Pull } from '../map/coverage.ts';
 import { travelField } from '../map/travel.ts';
 import { cfg, inside, price, typeAt } from '../map/valley.ts';
+import { contractExtra } from './contract.ts';
 import { bytesFor, midStep } from './types.ts';
 import type { Ctx, Reservation, Task } from './types.ts';
 
@@ -125,7 +126,8 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
       }
     }
   }
-  return out.filter((s) => s.gain > 0);
+  const contract = new Set((w.order?.cells ?? []).map(keyOf));
+  return out.filter((s) => s.gain > 0 || contract.has(keyOf(s.cell)));
 }
 
 interface Claim {
@@ -259,7 +261,7 @@ export function expand(ctx: Ctx): Task[] {
       const travel = field.get(k);
       if (travel === undefined) continue;
       const eta = travel + s.work;
-      const score = (s.gain * rate * Math.max(0, left - eta)) / Math.pow(eta + 1, ctx.preset.etaPower);
+      const score = (s.gain * rate * Math.max(0, left - eta) + contractExtra(ctx, s.cell, eta)) / Math.pow(eta + 1, ctx.preset.etaPower);
       if (score > bestScore) {
         bestScore = score;
         best = s;
