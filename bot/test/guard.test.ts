@@ -41,8 +41,6 @@ test('a Klinok already chasing is not re-ordered', () => {
   const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6, { task })] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] });
   assert.equal(guard(settled(obs)).length, 0);
 });
-  assert.equal(guard(settled(obs)).length, 0);
-});
 
 test('an idle Klinok far from the network returns to a central needle', () => {
   const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 0, 12)] } });
