@@ -37,7 +37,10 @@ test('far foes, foe Klinoks and Keeper machines are left alone', () => {
 
 test('a Klinok already chasing is not re-ordered', () => {
   const task = { goal: null, site: null, feed: null, jam: null, ram: 'T-A3', home: false, path: 1 };
-  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6, { task })] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 7, r: 5 }] });
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6, { task })] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] });
+  assert.equal(guard(settled(obs)).length, 0);
+});
   assert.equal(guard(settled(obs)).length, 0);
 });
 
@@ -90,4 +93,15 @@ test('no ram when the Klinok would arrive as the heat completes', () => {
   const early = ctxOf('B', { ...base, t: 100, foe: [] });
   for (let t = 195; t <= 200; t++) early.w.update({ ...base, t });
   assert.equal(guard(early).filter((t) => t.order.kind === 'ram').length, 1);
+});
+
+test('a chase is called off when the foe leaves our needle', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const chase = { goal: null, site: null, feed: null, jam: null, ram: 'T-A3', home: false, path: 2 };
+  const walking = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 7, 4, { task: chase })] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 10, r: 1 }] });
+  assert.deepEqual(guard(settled(walking)).map((t) => t.order), [{ kind: 'halt', unit: 'K-B7' }]);
+  const gone = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 7, 4, { task: chase })] } });
+  assert.deepEqual(guard(settled(gone)).map((t) => t.order), [{ kind: 'halt', unit: 'K-B7' }]);
+  const heating = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 7, 4, { task: chase })] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] });
+  assert.equal(guard(settled(heating)).length, 0);
 });

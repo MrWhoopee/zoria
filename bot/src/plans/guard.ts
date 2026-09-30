@@ -43,6 +43,14 @@ export function guard(ctx: Ctx): Task[] {
     .sort((a, b) => a.id.localeCompare(b.id));
   const tasks: Task[] = [];
   const used = new Set<string>();
+  for (const k of klinoks) {
+    const id = k.task?.ram;
+    if (!id) continue;
+    const f = w.foe.find((x) => x.id === id);
+    if (f && heatable.has(keyOf(f))) continue;
+    used.add(k.id);
+    tasks.push(task(ctx, k, 'guard:off', { kind: 'halt', unit: k.id }, GUARD_VALUE));
+  }
   for (const f of threats) {
     const heat = cfg(v, w.dark.get(keyOf(f)) === true ? 'heatDark' : 'heatEnemy');
     const inTime = (k: Cell): boolean => w.stillFor(f.id) + dist(k, f) + RAM_MARGIN < heat;
