@@ -35,6 +35,12 @@ export function inside(v: Valley, c: Cell): boolean {
   return v.level.has(keyOf(c));
 }
 
+export function levelAt(v: Valley, c: Cell): number {
+  const lv = v.level.get(keyOf(c));
+  if (lv === undefined) throw new Error('outside the valley ' + keyOf(c));
+  return lv;
+}
+
 export function typeAt(v: Valley, c: Cell): TerrainType | null {
   if (!inside(v, c)) return null;
   return v.types[v.terrain.get(keyOf(c)) ?? 0] ?? null;
@@ -60,7 +66,9 @@ export function buildValley(m: Manifest, slot: SlotName): Valley {
     for (let q = -radius; q <= radius; q++) {
       if (Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) > radius) continue;
       cells.push({ q, r });
-      level.set(key(q, r), m.levels[i] ?? 0);
+      const lv = m.levels[i];
+      if (lv === undefined) throw new Error('levels end at ' + i);
+      level.set(key(q, r), lv);
       i++;
     }
   }

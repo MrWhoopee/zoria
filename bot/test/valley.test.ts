@@ -25,7 +25,7 @@ test('cfg reads world numbers and throws on unknown keys', () => {
   const v = valleyOf('A');
   assert.equal(cfg(v, 'linkRange'), 5);
   assert.equal(cfg(v, 'costTkach'), 90);
-  assert.throws(() => cfg(v, 'noSuchKey'));
+  assert.throws(() => cfg(v, 'noSuchKey'), /^Error: cfg noSuchKey$/);
 });
 
 test('terrain lookup, price and inside', () => {
@@ -42,4 +42,15 @@ test('terrain lookup, price and inside', () => {
 test('dead-cell finds are collected', () => {
   const v = valleyOf('A');
   assert.equal(v.dead.has('0,9'), true);
+});
+
+test('strict lookups name what is missing', async () => {
+  const { buildValley, levelAt } = await import('../src/map/valley.ts');
+  const { manifestOf } = await import('./fixture.ts');
+  assert.throws(() => levelAt(valleyOf('A'), { q: 0, r: 20 }), /^Error: outside the valley 0,20$/);
+  const m = manifestOf();
+  assert.throws(() => buildValley({ ...m, levels: m.levels.slice(0, 10) }, 'A'), /^Error: levels end at 10$/);
+  assert.throws(() => buildValley({ ...m, needles: m.needles.filter((n) => n.start !== 'B') }, 'A'), /^Error: no seat for B$/);
+  const oneStart = m.needles.filter((n) => !(n.start === 'B' && n.q === 5));
+  assert.deepEqual(buildValley({ ...m, needles: oneStart }, 'B').base, { q: 6, r: 6 });
 });
