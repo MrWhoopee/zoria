@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Order } from '@zoria/protocol';
 import { dist, keyOf } from '../src/hex.ts';
-import { expand, release } from '../src/plans/expand.ts';
+import { expand, reconnectValue, release, unlockValue } from '../src/plans/expand.ts';
+import { presetOf } from '../src/preset.ts';
 import { ctxOf } from './ctx.ts';
 import { makeObs, tkach } from './obs.ts';
 
@@ -44,7 +45,7 @@ test('a Tkach mid-step gets no order', () => {
 
 test('builds when no ruin is available and energy allows', () => {
   const v = ctxOf('B', makeObs()).v;
-  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'A' as const, dark: true }));
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'K' as const, dark: true }));
   const units = [tkach('T-B6', 6, 6), tkach('T-B7', 6, 7), tkach('T-B8', 7, 6)];
   const ctx = ctxOf('B', makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 200 }, own, mine: { ...makeObs().mine, needles: starts, units } }));
   const tasks = expand(ctx);
@@ -59,8 +60,8 @@ test('builds when no ruin is available and energy allows', () => {
 
 test('with nothing to take, a Tkach feeds an own lit needle', () => {
   const v = ctxOf('B', makeObs()).v;
-  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'A' as const, dark: true }));
-  const ctx = ctxOf('B', makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 10 }, own, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'K' as const, dark: true }));
+  const ctx = ctxOf('B', makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 10 }, own, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }), 2026, { ...presetOf('основний'), feed: true });
   const tasks = expand(ctx);
   assert.equal(tasks[0]?.order.kind, 'feed');
 });
@@ -103,4 +104,52 @@ test('an idle reserved Tkach away from its target is re-sent, but not every tick
   assert.equal(target(tasks[0]?.order), keyOf(r0));
   ctx.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 50, sent: 58 });
   assert.equal(expand(ctx).length, 0);
+});
+
+test('a linked foe needle is a target when no ruin is free', () => {
+  const v = ctxOf('B', makeObs()).v;
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'A' as const, dark: false }));
+  const ctx = ctxOf('B', makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 10 }, own, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
+  const tasks = expand(ctx);
+  assert.equal(tasks[0]?.order.kind, 'move');
+  const k = target(tasks[0]?.order);
+  assert.equal(ctx.w.owner.get(k), 'A');
+  assert.ok(!ctx.v.starts.some((s) => keyOf(s.cell) === k));
+});
+
+test('a take reservation on a foe needle survives until the owner changes', () => {
+  const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
+  const r0 = ctx.v.ruins[0];
+  assert.ok(r0);
+  ctx.w.owner.set(keyOf(r0), 'A');
+  ctx.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 50, sent: 50, owner: 'A' });
+  release(ctx);
+  assert.equal(ctx.memo.res.size, 1);
+  ctx.w.owner.set(keyOf(r0), 'C');
+  release(ctx);
+  assert.equal(ctx.memo.res.size, 0);
+});
+
+test('a bridge site is worth the ruins it brings into reach', () => {
+  const ctx = ctxOf('B', makeObs({ t: 100, mine: { ...makeObs().mine, needles: starts } }));
+  const anchors = [ctx.v.base, ...ctx.w.ownLit()];
+  const far = ctx.v.ruins.find((r) => !ctx.links.reach(r, anchors) && ctx.v.cells.some((c) => ctx.links.reach(c, anchors) && ctx.links.ok(c, r)));
+  assert.ok(far);
+  const site = ctx.v.cells.find((c) => ctx.links.reach(c, anchors) && ctx.links.ok(c, far));
+  assert.ok(site);
+  assert.ok(unlockValue(ctx, site, anchors, new Map(), new Map()) > 0);
+  assert.equal(unlockValue(ctx, ctx.v.base, anchors, new Map(), new Map()), 0);
+});
+
+test('a repair site is worth the cut needles it reconnects', () => {
+  const probe = ctxOf('B', makeObs());
+  const anchors = [probe.v.base, { q: 7, r: 5 }, { q: 5, r: 7 }];
+  const cut = probe.v.ruins.find((r) => !probe.links.reach(r, anchors) && probe.v.cells.some((c) => probe.links.reach(c, anchors) && probe.links.ok(c, r)));
+  assert.ok(cut);
+  const needles = [...starts, { q: cut.q, r: cut.r, dark: true, fed: false, weight: 0 }];
+  const ctx = ctxOf('B', makeObs({ t: 100, mine: { ...makeObs().mine, needles } }));
+  const site = ctx.v.cells.find((c) => ctx.links.reach(c, anchors) && ctx.links.ok(c, cut));
+  assert.ok(site);
+  assert.ok(reconnectValue(ctx, site, anchors, new Map(), new Map()) > 0);
+  assert.equal(reconnectValue(ctx, ctx.v.base, anchors, new Map(), new Map()), 0);
 });

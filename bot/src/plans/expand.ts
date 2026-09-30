@@ -1,7 +1,7 @@
-import type { MineUnit, Order } from '@zoria/protocol';
-import { disc, dist, keyOf } from '../hex.ts';
+import type { ActorName, MineUnit, Order } from '@zoria/protocol';
+import { disc, dist, keyOf, parse } from '../hex.ts';
 import type { Cell } from '../hex.ts';
-import { gain, pullOf } from '../map/coverage.ts';
+import { gain, pullOf, takeGain } from '../map/coverage.ts';
 import type { Pull } from '../map/coverage.ts';
 import { travelField } from '../map/travel.ts';
 import { cfg, inside, price, typeAt } from '../map/valley.ts';
@@ -16,6 +16,8 @@ interface Site {
   cell: Cell;
   kind: 'take' | 'build';
   gain: number;
+  work: number;
+  owner: ActorName | null;
 }
 
 export function release(ctx: Ctx): void {
@@ -24,7 +26,8 @@ export function release(ctx: Ctx): void {
   for (const [id, r] of memo.res) {
     const o = w.owner.get(keyOf(r.cell));
     const done = r.kind !== 'feed' && o === v.slot;
-    const gone = r.kind === 'take' ? o !== null && o !== v.slot : r.kind === 'build' ? o !== undefined && o !== v.slot : o !== v.slot;
+    const was = r.owner ?? null;
+    const gone = r.kind === 'take' ? o !== was && o !== v.slot : r.kind === 'build' ? o !== undefined && o !== v.slot : o !== v.slot;
     if (!alive.has(id) || done || gone || w.t - r.since > RESERVE_TTL) memo.res.delete(id);
   }
 }
@@ -37,17 +40,56 @@ function buildable(ctx: Ctx, c: Cell): boolean {
   return Object.values(v.seats).every((s) => dist(s, c) > 2);
 }
 
+export function unlockValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull, foe: Pull): number {
+  const { v, w, links } = ctx;
+  const range = cfg(v, 'linkRange') + 1;
+  let total = 0;
+  for (const r of v.ruins) {
+    if (dist(r, site) > range || w.owner.get(keyOf(r)) !== null) continue;
+    if (!links.ok(site, r) || links.reach(r, anchors)) continue;
+    total += gain(v, r, own, foe);
+  }
+  return total;
+}
+
+export function reconnectValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull, foe: Pull): number {
+  const { v, w, links } = ctx;
+  const cut = w.mine.filter((n) => n.dark).map((n) => ({ q: n.q, r: n.r })).filter((c) => !links.reach(c, anchors));
+  const reached = new Set<string>();
+  const queue = cut.filter((c) => links.ok(site, c));
+  let total = 0;
+  for (let c = queue.shift(); c; c = queue.shift()) {
+    const k = keyOf(c);
+    if (reached.has(k)) continue;
+    reached.add(k);
+    total += gain(v, c, own, foe);
+    for (const n of cut) if (!reached.has(keyOf(n)) && links.ok(c, n)) queue.push(n);
+  }
+  return total;
+}
+
 function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<string>): Site[] {
-  const { v, w, links, memo } = ctx;
+  const { v, w, links, memo, preset } = ctx;
   const out: Site[] = [];
   const free = (k: string): boolean => !reserved.has(k) && !memo.banned.has(k);
-  for (const c of v.ruins) {
-    const k = keyOf(c);
-    if (w.owner.get(k) !== null || !free(k) || !links.reach(c, anchors)) continue;
-    out.push({ cell: c, kind: 'take', gain: gain(v, c, own, foe) });
+  const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
+  for (const [k, o] of w.owner) {
+    if (o === v.slot || starts.has(k) || !free(k)) continue;
+    const keeper = o === 'K';
+    if (keeper && w.t < v.dawnAt) continue;
+    const c = parse(k);
+    if (!links.reach(c, anchors)) continue;
+    if (o === null) {
+      out.push({ cell: c, kind: 'take', gain: gain(v, c, own, foe), work: cfg(v, 'heatNeedle'), owner: null });
+      continue;
+    }
+    const dark = keeper || w.dark.get(k) === true;
+    const mult = dark ? 0 : 1;
+    const work = keeper ? cfg(v, 'heatNeedle') : dark ? cfg(v, 'heatDark') : cfg(v, 'heatEnemy');
+    out.push({ cell: c, kind: 'take', gain: takeGain(v, c, own, foe, mult, preset.harm), work, owner: o });
   }
   const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
-  const need = cfg(v, 'costNeedle') + ctx.preset.buildReserve + (tkachs < ctx.preset.tkachTarget ? cfg(v, 'costTkach') : 0);
+  const need = cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0);
   if (w.energy >= need) {
     const seen = new Set<string>();
     const range = cfg(v, 'linkRange');
@@ -57,7 +99,8 @@ function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<st
         if (seen.has(k) || dist(a, c) < 3) continue;
         seen.add(k);
         if (!inside(v, c) || !free(k) || !buildable(ctx, c) || !links.reach(c, anchors)) continue;
-        out.push({ cell: c, kind: 'build', gain: gain(v, c, own, foe) });
+        const value = gain(v, c, own, foe) + preset.unlock * unlockValue(ctx, c, anchors, own, foe) + reconnectValue(ctx, c, anchors, own, foe);
+        out.push({ cell: c, kind: 'build', gain: value, work: cfg(v, 'buildTicks'), owner: null });
       }
     }
   }
@@ -69,7 +112,7 @@ function siteOrder(unit: string, s: { cell: Cell; kind: 'take' | 'build' }): Ord
   return { kind: 'needle', unit, q: s.cell.q, r: s.cell.r };
 }
 
-function taskFor(ctx: Ctx, u: MineUnit, kind: Reservation['kind'], cell: Cell, order: Order, value: number, since: number): Task {
+function taskFor(ctx: Ctx, u: MineUnit, kind: Reservation['kind'], cell: Cell, order: Order, value: number, since: number, owner: ActorName | null = null): Task {
   const k = keyOf(cell);
   return {
     tag: 'expand:' + kind,
@@ -80,7 +123,7 @@ function taskFor(ctx: Ctx, u: MineUnit, kind: Reservation['kind'], cell: Cell, o
     hands: u.task === null ? cfg(ctx.v, 'chanTick') : 0,
     energy: 0,
     commit: (m, t) => {
-      m.res.set(u.id, { kind, cell, since: since < 0 ? t : since, sent: t });
+      m.res.set(u.id, { kind, cell, since: since < 0 ? t : since, sent: t, owner });
     },
     refused: (m, code) => {
       m.res.delete(u.id);
@@ -121,7 +164,7 @@ export function expand(ctx: Ctx): Task[] {
     const r = memo.res.get(u.id);
     if (!r || r.kind === 'feed' || u.task !== null || w.t - r.sent < REISSUE_GAP) continue;
     if (r.kind === 'take' && u.q === r.cell.q && u.r === r.cell.r) continue;
-    tasks.push(taskFor(ctx, u, r.kind, r.cell, siteOrder(u.id, { cell: r.cell, kind: r.kind }), 1, r.since));
+    tasks.push(taskFor(ctx, u, r.kind, r.cell, siteOrder(u.id, { cell: r.cell, kind: r.kind }), 1, r.since, r.owner ?? null));
   }
   const free = ready.filter((u) => {
     const r = memo.res.get(u.id);
@@ -141,7 +184,7 @@ export function expand(ctx: Ctx): Task[] {
       if (taken.has(k)) continue;
       const travel = field.get(k);
       if (travel === undefined) continue;
-      const eta = travel + cfg(v, s.kind === 'take' ? 'heatNeedle' : 'buildTicks');
+      const eta = travel + s.work;
       const score = (s.gain * rate * Math.max(0, left - eta)) / Math.pow(eta + 1, ctx.preset.etaPower);
       if (score > bestScore) {
         bestScore = score;
@@ -150,7 +193,7 @@ export function expand(ctx: Ctx): Task[] {
     }
     if (best) {
       taken.add(keyOf(best.cell));
-      tasks.push(taskFor(ctx, u, best.kind, best.cell, siteOrder(u.id, best), bestScore, -1));
+      tasks.push(taskFor(ctx, u, best.kind, best.cell, siteOrder(u.id, best), bestScore, -1, best.owner));
       continue;
     }
     if (memo.res.has(u.id) || !ctx.preset.feed) continue;

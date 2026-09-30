@@ -1,5 +1,5 @@
 import { orderCost } from '@zoria/protocol';
-import type { ChannelCfg, MineUnit, Order, OrderKind } from '@zoria/protocol';
+import type { ActorName, ChannelCfg, MineUnit, Order, OrderKind } from '@zoria/protocol';
 import type { Cell } from '../hex.ts';
 import type { Links } from '../map/links.ts';
 import type { Preset } from '../preset.ts';
@@ -12,6 +12,7 @@ export interface Reservation {
   cell: Cell;
   since: number;
   sent: number;
+  owner?: ActorName | null;
 }
 
 export interface Memo {

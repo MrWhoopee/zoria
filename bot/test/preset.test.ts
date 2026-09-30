@@ -23,10 +23,10 @@ test('yard follows the preset Tkach target', () => {
 
 test('a preset without feeding never feeds', () => {
   const v = ctxOf('B', makeObs()).v;
-  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'A' as const, dark: true }));
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'K' as const, dark: true }));
   const obs = makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 10 }, own, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } });
-  assert.equal(expand(ctxOf('B', obs))[0]?.order.kind, 'feed');
-  assert.equal(expand(ctxOf('B', obs, 2026, { ...presetOf('основний'), feed: false })).length, 0);
+  assert.equal(expand(ctxOf('B', obs, 2026, { ...presetOf('основний'), feed: true }))[0]?.order.kind, 'feed');
+  assert.equal(expand(ctxOf('B', obs)).length, 0);
 });
 
 test('strategy lists every preset', () => {

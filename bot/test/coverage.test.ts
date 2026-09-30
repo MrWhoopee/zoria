@@ -52,3 +52,13 @@ test('contested ground is worth less than free ground', () => {
   const foe = pullOf(v, [{ cell: { q: 1, r: -10 }, mult: 1 }]);
   assert.ok(gain(v, site, new Map(), foe) < gain(v, site, new Map(), new Map()));
 });
+
+test('taking a foe needle gains our share and removes theirs', async () => {
+  const { takeGain } = await import('../src/map/coverage.ts');
+  const v = valleyOf('A');
+  const site = { q: 0, r: -10 };
+  const foe = pullOf(v, [{ cell: site, mult: 1 }]);
+  const free = gain(v, site, new Map(), new Map());
+  assert.ok(Math.abs(takeGain(v, site, new Map(), foe, 1, 0) - free) < 1e-9);
+  assert.ok(Math.abs(takeGain(v, site, new Map(), foe, 1, 1) - 2 * free) < 1e-9);
+});
