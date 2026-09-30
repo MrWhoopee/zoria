@@ -10,7 +10,7 @@ import type { Ctx, Reservation, Task } from './types.ts';
 
 export const RESERVE_TTL = 200;
 export const REISSUE_GAP = 6;
-export const AWAY_LIMIT = 20;
+export const AWAY_LIMIT = 32;
 export const HEAT_SLACK = 12;
 export const BAN_TICKS = 80;
 export const REFUSE_BAN = 150;
@@ -186,6 +186,16 @@ function nearestHome(anchors: Cell[], u: Cell): Cell {
   return best;
 }
 
+function leashRisk(ctx: Ctx, u: MineUnit): boolean {
+  const r = ctx.memo.res.get(u.id);
+  const autonomy = cfg(ctx.v, 'autonomy');
+  if (r && r.kind !== 'feed' && u.q === r.cell.q && u.r === r.cell.r) {
+    const left = (r.work ?? 0) - (ctx.w.t - (r.arrived ?? ctx.w.t));
+    return u.away > 0 && u.away + Math.max(0, left) >= autonomy - 2;
+  }
+  return u.away >= AWAY_LIMIT;
+}
+
 function overstayed(ctx: Ctx, u: MineUnit): void {
   const { w, memo } = ctx;
   const r = memo.res.get(u.id);
@@ -210,7 +220,7 @@ export function expand(ctx: Ctx): Task[] {
   for (const u of ready) {
     overstayed(ctx, u);
     const r = memo.res.get(u.id);
-    if (u.away >= AWAY_LIMIT && r?.kind !== 'home') {
+    if (r?.kind !== 'home' && leashRisk(ctx, u)) {
       leashed.add(u.id);
       const home = nearestHome(lit.length > 0 ? lit : [v.base], u);
       tasks.push(taskFor(ctx, u, { kind: 'home', cell: home, owner: null, work: 0 }, 1e5, -1));

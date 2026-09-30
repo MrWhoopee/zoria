@@ -171,7 +171,7 @@ test('retaking a captured link is worth the branch it reconnects', () => {
 });
 
 test('a Tkach long out of link range heads to the nearest lit needle', () => {
-  const ctx = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 0, 0, { away: 25 })] } }));
+  const ctx = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 0, 0, { away: 33 })] } }));
   ctx.memo.res.set('T-B6', { kind: 'take', cell: { q: -5, r: 0 }, since: 250, sent: 250, owner: null });
   const tasks = expand(ctx);
   assert.equal(tasks.length, 1);
@@ -206,4 +206,17 @@ test('standing on a target far longer than the heat takes gives it up for a whil
   expand(at(125));
   assert.equal(ctx.memo.res.get('T-B6')?.cell === r0, false);
   assert.ok((ctx.memo.banned.get(keyOf(r0)) ?? 0) > 125);
+});
+
+test('a Tkach heating on target is not pulled home while the heat fits the leash', () => {
+  const r0 = ctxOf('B', makeObs()).v.ruins[0];
+  assert.ok(r0);
+  const obs = makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', r0.q, r0.r, { away: 25 })] } });
+  const ctx = ctxOf('B', obs);
+  ctx.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 280, sent: 280, owner: null, work: 8, arrived: 296 });
+  assert.equal(expand(ctx).length, 0);
+  const late = ctxOf('B', obs);
+  late.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 280, sent: 280, owner: null, work: 24, arrived: 299 });
+  assert.equal(expand(late)[0]?.order.kind, 'move');
+  late.memo.res.clear();
 });
