@@ -28,3 +28,12 @@ test('low-value tasks leave the hands of working units alone', () => {
   const roomy = allocate([task('post', 0.01, 32, 'K1')], { chan: 141, cap: 10, energy: 0, reserve: 64 });
   assert.deepEqual(roomy.map((t) => t.tag), ['post']);
 });
+
+test('boundaries: order cap, exact channel, exact energy, exact reserve, value one is not low', () => {
+  assert.deepEqual(allocate([task('a', 5, 0, 'T1'), task('b', 4, 0, 'T2')], { chan: 100, cap: 1, energy: 0, reserve: 0 }).map((t) => t.tag), ['a']);
+  assert.deepEqual(allocate([task('a', 5, 32, 'T1'), task('b', 4, 1, 'T2')], { chan: 32, cap: 5, energy: 0, reserve: 0 }).map((t) => t.tag), ['a']);
+  assert.deepEqual(allocate([task('a', 5, 0, 'T1', 90)], { chan: 32, cap: 5, energy: 90, reserve: 0 }).map((t) => t.tag), ['a']);
+  assert.deepEqual(allocate([task('p', 0.5, 32, 'K1')], { chan: 96, cap: 5, energy: 0, reserve: 64 }).map((t) => t.tag), ['p']);
+  assert.deepEqual(allocate([task('p', 0.99, 32, 'K1')], { chan: 95, cap: 5, energy: 0, reserve: 64 }).map((t) => t.tag), []);
+  assert.deepEqual(allocate([task('p', 1, 32, 'K1')], { chan: 95, cap: 5, energy: 0, reserve: 64 }).map((t) => t.tag), ['p']);
+});

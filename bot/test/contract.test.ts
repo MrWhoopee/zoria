@@ -53,3 +53,12 @@ test('an open contract pulls a free Tkach to its cells', async () => {
   assert.ok(o && o.kind === 'move');
   assert.ok(order.cells.some((x) => x.q === o.q && x.r === o.r));
 });
+
+test('a hold that ends exactly at the deadline still counts, one missing cell takes the whole bonus', () => {
+  const order = board([[8, 2], [9, 2], [10, 1]], 150);
+  const ctx = ctxOf('B', makeObs({ t: 120, pub: { ...makeObs().pub, order }, mine: { ...makeObs().mine, needles: starts } }));
+  assert.equal(contractExtra(ctx, { q: 9, r: 2 }, 18), 10);
+  const two = [...starts, { q: 8, r: 2, dark: false, fed: false, weight: 1 }, { q: 9, r: 2, dark: false, fed: false, weight: 1 }];
+  const last = ctxOf('B', makeObs({ t: 120, pub: { ...makeObs().pub, order }, mine: { ...makeObs().mine, needles: two } }));
+  assert.equal(contractExtra(last, { q: 10, r: 1 }, 5), 30);
+});

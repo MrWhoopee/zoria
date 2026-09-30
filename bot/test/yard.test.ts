@@ -54,3 +54,25 @@ test('with the Tkachs in place the yard adds a Klinok', () => {
   const withK = [...units, { ...tkach('K-B4', 6, 6), cls: 'клинок' as const }, { ...tkach('K-B5', 7, 6), cls: 'клинок' as const }];
   assert.equal(yard(ctxOf('B', makeObs({ pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units: withK } }))).length, 0);
 });
+
+test('a hull due this tick no longer counts, and pending hulls weigh in the swarm', () => {
+  const two = [tkach('T-B1', 6, 6), tkach('T-B2', 6, 7)];
+  const ctx = ctxOf('B', makeObs({ t: 6, pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units: two } }));
+  ctx.memo.pendingYard = [{ cls: 'ткач', eta: 6 }];
+  assert.deepEqual(yard(ctx)[0]?.order, { kind: 'yard', cls: 'ткач' });
+  const three = [...two, tkach('T-B3', 7, 6)];
+  const full = ctxOf('B', makeObs({ t: 6, pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units: three } }), 2026, { ...presetOf('широкий'), klinokTarget: 1 });
+  full.memo.pendingYard = [{ cls: 'ткач', eta: 9 }];
+  assert.equal(yard(full).length, 0);
+  const room = ctxOf('B', makeObs({ t: 6, pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units: three } }), 2026, { ...presetOf('основний'), klinokTarget: 2 });
+  room.memo.pendingYard = [{ cls: 'клинок', eta: 9 }];
+  assert.deepEqual(yard(room)[0]?.order, { kind: 'yard', cls: 'клинок' });
+});
+
+test('exactly enough energy is enough, and the hull is expected after the build time', () => {
+  const ctx = ctxOf('B', makeObs({ t: 1, pulse: { ...makeObs().pulse, energy: 90 } }));
+  const t = yard(ctx)[0];
+  assert.ok(t);
+  t.commit(ctx.memo, 1);
+  assert.deepEqual(ctx.memo.pendingYard, [{ cls: 'ткач', eta: 6 }]);
+});

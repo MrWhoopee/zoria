@@ -22,3 +22,10 @@ test('brain stats are exposed after init', () => {
   s.init(manifestBytes(), 'A');
   assert.deepEqual(s.stats(), { errors: 0, lastError: '', skipped: 0 });
 });
+
+test('verdicts before the manifest are ignored', async () => {
+  const { encodeVerdicts } = await import('@zoria/protocol');
+  const s = createStrategy();
+  s.feedback?.(encodeVerdicts([[0, true, 0]]));
+  assert.equal(s.stats(), null);
+});

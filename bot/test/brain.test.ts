@@ -80,3 +80,27 @@ test('keep-alive falls back to a watch when the idle unit already got a refused 
   }
   assert.ok(worst < 6, 'silent run ' + worst);
 });
+
+test('the time guard allows exactly the limit', () => {
+  let now = 0;
+  let second = 0;
+  const b = brainWith([() => { now += 300; return []; }, () => { second++; return []; }], () => now);
+  b.tick(makeObs({ t: 1 }));
+  assert.equal(second, 1);
+  assert.equal(b.stats.skipped, 0);
+});
+
+test('a low-value task waits while busy units need the channel for hands', () => {
+  const busy = { goal: null, site: null, feed: null, jam: null, ram: null, home: false, path: 2 };
+  const low: Advisor = () => [{ tag: 'low', unit: 'T-B9', order: { kind: 'halt', unit: 'T-B9' }, value: 0.01, bytes: 32, energy: 0, commit: () => undefined, refused: () => undefined }];
+  const four = ['T-B1', 'T-B2', 'T-B3', 'T-B4'].map((id) => tkach(id, 6, 6, { task: busy }));
+  const b = brainWith([low]);
+  assert.deepEqual(b.tick(makeObs({ t: 2, mine: { ...makeObs().mine, needles: starts, units: [...four, tkach('T-B9', 6, 6)] } })), []);
+  const b2 = brainWith([low]);
+  assert.equal(b2.tick(makeObs({ t: 2, mine: { ...makeObs().mine, needles: starts, units: [...four.slice(0, 2), tkach('T-B9', 6, 6)] } })).length, 1);
+});
+
+test('the think limit is 300 ms of the 500 ms deadline', async () => {
+  const { THINK_LIMIT_MS } = await import('../src/brain.ts');
+  assert.equal(THINK_LIMIT_MS, 300);
+});

@@ -28,3 +28,10 @@ test('belief frame carries pulse, owners, dark needles, foes and units', () => {
   assert.ok(line.endsWith('\n'));
   assert.equal(JSON.parse(line).t, 9);
 });
+
+test('without an observe the frame has no foes and no noise', () => {
+  const w = new World(valleyOf('B'));
+  const f = beliefFrame(w, null);
+  assert.equal(f.noisy, 0);
+  assert.deepEqual(f.foe, []);
+});
