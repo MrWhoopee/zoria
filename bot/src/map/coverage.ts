@@ -5,6 +5,12 @@ import type { Valley } from './valley.ts';
 
 export type Pull = Map<string, number>;
 
+export function ringWeight(v: Valley, d: number): number {
+  const w = v.rings[d];
+  if (w === undefined) throw new Error('no ring weight at ' + d);
+  return w;
+}
+
 export interface Source {
   cell: Cell;
   mult: number;
@@ -16,7 +22,7 @@ export function pullOf(v: Valley, sources: Source[]): Pull {
   for (const s of sources) {
     for (const c of disc(s.cell, reach)) {
       if (!inside(v, c)) continue;
-      const w = (v.rings[dist(c, s.cell)] ?? 0) * s.mult;
+      const w = ringWeight(v, dist(c, s.cell)) * s.mult;
       const k = keyOf(c);
       p.set(k, (p.get(k) ?? 0) + w);
     }
@@ -25,19 +31,17 @@ export function pullOf(v: Valley, sources: Source[]): Pull {
 }
 
 export function share(own: number, foe: number): number {
-  const sum = own + foe;
-  return sum <= 1 ? own : own / sum;
+  return own / Math.max(1, own + foe);
 }
 
 export function gain(v: Valley, site: Cell, own: Pull, foe: Pull, mult = 1): number {
   let total = 0;
   for (const c of disc(site, v.rings.length - 1)) {
     const cost = price(v, c);
-    if (cost === 0) continue;
     const k = keyOf(c);
     const o = own.get(k) ?? 0;
     const f = foe.get(k) ?? 0;
-    const w = (v.rings[dist(c, site)] ?? 0) * mult;
+    const w = ringWeight(v, dist(c, site)) * mult;
     total += cost * (share(o + w, f) - share(o, f));
   }
   return total;
@@ -47,9 +51,8 @@ export function takeGain(v: Valley, site: Cell, own: Pull, foe: Pull, foeMult: n
   let total = 0;
   for (const c of disc(site, v.rings.length - 1)) {
     const cost = price(v, c);
-    if (cost === 0) continue;
     const k = keyOf(c);
-    const ring = v.rings[dist(c, site)] ?? 0;
+    const ring = ringWeight(v, dist(c, site));
     const o = own.get(k) ?? 0;
     const f = foe.get(k) ?? 0;
     const f2 = Math.max(0, f - ring * foeMult);

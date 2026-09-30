@@ -76,3 +76,35 @@ test('update keeps the open contract and our hold progress', () => {
   assert.equal(w.order, null);
   assert.equal(w.hold, null);
 });
+
+test('a fresh world has an empty pulse', () => {
+  const w = new World(valleyOf('A'));
+  assert.deepEqual([w.t, w.energy, w.chan, w.chanAt, w.ear, w.minutes], [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual([w.units, w.mine, w.foe, w.order, w.hold], [[], [], [], null, null]);
+});
+
+test('foeLit skips ruins, our own and dark needles and weighs ring needles', () => {
+  const v = valleyOf('B');
+  const w = new World(v);
+  const [r0, r1, r2] = v.ruins;
+  assert.ok(r0 && r1 && r2);
+  w.update(makeObs({ t: 5, own: [{ q: r0.q, r: r0.r, owner: 'A', dark: false }, { q: r1.q, r: r1.r, owner: 'C', dark: true }], mine: { ...makeObs().mine, needles: [{ q: r2.q, r: r2.r, dark: false, fed: false, weight: 1 }] } }));
+  const lit = w.foeLit();
+  const keys = lit.map((s) => keyOf(s.cell));
+  assert.ok(keys.includes(keyOf(r0)));
+  assert.ok(!keys.includes(keyOf(r1)));
+  assert.ok(!keys.includes(keyOf(r2)));
+  assert.ok(!v.ruins.slice(3).some((r) => keys.includes(keyOf(r))));
+  assert.equal(lit.find((s) => keyOf(s.cell) === keyOf(r0))?.mult, 1);
+  assert.equal(lit.find((s) => keyOf(s.cell) === '7,5'), undefined);
+  assert.ok(lit.some((s) => keyOf(s.cell) === '5,-12' && s.mult === 1));
+});
+
+test('a ring needle pulls with the ring multiplier whoever holds it', () => {
+  const v = valleyOf('B');
+  const w = new World(v);
+  const ring = v.ring[0];
+  assert.ok(ring);
+  w.update(makeObs({ t: 5, own: [{ q: ring.q, r: ring.r, owner: 'A', dark: false }] }));
+  assert.equal(w.foeLit().find((s) => keyOf(s.cell) === keyOf(ring))?.mult, v.cfg['ringPull']);
+});

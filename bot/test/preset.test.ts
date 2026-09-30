@@ -45,3 +45,16 @@ test('preset names accept knob overrides', () => {
   assert.throws(() => presetOf('скупий+nosuch=1'));
   assert.throws(() => presetOf('скупий+steal=x'));
 });
+
+test('preset values are pinned', () => {
+  assert.deepEqual(PRESETS['основний'], { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2, contract: 1, dawnPrep: 1 });
+  assert.deepEqual([PRESETS['широкий']?.tkachTarget, PRESETS['широкий']?.etaPower], [4, 0.8]);
+  assert.equal(PRESETS['ближній']?.etaPower, 1.5);
+  assert.deepEqual([PRESETS['скупий']?.tkachTarget, PRESETS['скупий']?.buildReserve], [2, 60]);
+  assert.deepEqual([PRESETS['варта']?.tkachTarget, PRESETS['варта']?.klinokTarget], [2, 4]);
+});
+
+test('every malformed knob is refused with its text', () => {
+  for (const bad of ['steal', 'steal=', '=1', 'nosuch=1', 'steal=x']) assert.throws(() => presetOf('основний+' + bad), new RegExp('^Error: bad preset knob ' + bad.replace('=', '\=') + '$'));
+  assert.equal(presetOf('основний+feed=0').feed, false);
+});

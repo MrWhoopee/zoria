@@ -20,9 +20,7 @@ export class Links {
 
   ok(a: Cell, b: Cell): boolean {
     if (dist(a, b) > this.range) return false;
-    const ka = keyOf(a);
-    const kb = keyOf(b);
-    const k = ka < kb ? ka + '|' + kb : kb + '|' + ka;
+    const k = [keyOf(a), keyOf(b)].sort().join('|');
     const hit = this.memo.get(k);
     if (hit !== undefined) return hit;
     const res = this.oracle.linkOk(a, b);

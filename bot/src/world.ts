@@ -76,8 +76,7 @@ export class World {
     const ringPull = cfg(this.v, 'ringPull');
     for (const [k, o] of this.owner) {
       if (o === null || o === this.v.slot || this.dark.get(k) === true) continue;
-      const ring = o === 'K' && this.v.ringKeys.has(k);
-      out.push({ cell: parse(k), mult: ring ? ringPull : 1 });
+      out.push({ cell: parse(k), mult: this.v.ringKeys.has(k) ? ringPull : 1 });
     }
     return out;
   }

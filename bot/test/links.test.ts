@@ -21,3 +21,12 @@ test('reach is true when any anchor links', () => {
   assert.equal(links.reach({ q: 1, r: 4 }, [{ q: 0, r: 0 }]), false);
   assert.equal(links.reach({ q: 0, r: 4 }, []), false);
 });
+
+test('the reach limit is the link range plus one for hills', () => {
+  const v = valleyOf('A');
+  let calls = 0;
+  const links = new Links({ linkOk: () => { calls++; return true; } }, v);
+  assert.equal(links.ok({ q: 0, r: 0 }, { q: 0, r: 6 }), true);
+  assert.equal(calls, 1);
+  assert.equal(links.ok({ q: 0, r: 0 }, { q: 0, r: 0 }), true);
+});
