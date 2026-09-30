@@ -267,3 +267,13 @@ test('leaving a far site on the leash bans that site for a while', () => {
   expand(ctx);
   assert.ok((ctx.memo.banned.get(keyOf(r0)) ?? 0) > 300);
 });
+
+test('no building while the Klinok guard is short', () => {
+  const v = ctxOf('B', makeObs()).v;
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'K' as const, dark: true }));
+  const units = [tkach('T-B6', 6, 6), tkach('T-B7', 6, 7), tkach('T-B8', 7, 6)];
+  const short = ctxOf('B', makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 100 }, own, mine: { ...makeObs().mine, needles: starts, units } }));
+  assert.ok(expand(short).every((t) => t.order.kind !== 'needle'));
+  const rich = ctxOf('B', makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 170 }, own, mine: { ...makeObs().mine, needles: starts, units } }));
+  assert.ok(expand(rich).some((t) => t.order.kind === 'needle'));
+});

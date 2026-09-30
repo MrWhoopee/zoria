@@ -9,7 +9,10 @@ export function yard(ctx: Ctx): Task[] {
   const count = (cls: ClsName): number => w.units.filter((u) => u.cls === cls).length + memo.pendingYard.filter((p) => p.cls === cls).length;
   const weightOfCls = (cls: ClsName): number => cfg(v, cls === 'ткач' ? 'weightTkach' : 'weightKlinok');
   const weight = weightOf(v, w.units) + memo.pendingYard.reduce((s, p) => s + weightOfCls(p.cls), 0);
-  const cls: ClsName | null = count('ткач') < preset.tkachTarget ? 'ткач' : count('клинок') < preset.klinokTarget ? 'клинок' : null;
+  const tk = count('ткач');
+  const kl = count('клинок');
+  const guardFirst = kl === 0 && preset.klinokTarget > 0 && tk >= Math.min(2, preset.tkachTarget);
+  const cls: ClsName | null = guardFirst ? 'клинок' : tk < preset.tkachTarget ? 'ткач' : kl < preset.klinokTarget ? 'клинок' : null;
   if (cls === null) return [];
   const cost = cfg(v, cls === 'ткач' ? 'costTkach' : 'costKlinok');
   if (weight + weightOfCls(cls) > cfg(v, 'squadWeight') || w.energy < cost) return [];

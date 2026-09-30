@@ -128,7 +128,9 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
     out.push({ cell: c, kind: 'take', gain: value + back(c), work, owner: o });
   }
   const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
-  const need = cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0);
+  const klinoks = w.units.filter((u) => u.cls === 'клинок').length;
+  const guardGap = Math.max(0, preset.klinokTarget - klinoks) * cfg(v, 'costKlinok');
+  const need = cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0) + guardGap;
   if (w.energy >= need) {
     const seen = new Set<string>();
     const range = cfg(v, 'linkRange');

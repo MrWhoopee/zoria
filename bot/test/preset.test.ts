@@ -18,7 +18,7 @@ test('yard follows the preset Tkach target', () => {
   const units = [tkach('T-B1', 6, 6), tkach('T-B2', 6, 7), tkach('T-B3', 7, 6)];
   const obs = makeObs({ pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units } });
   assert.deepEqual(yard(ctxOf('B', obs))[0]?.order, { kind: 'yard', cls: 'клинок' });
-  assert.deepEqual(yard(ctxOf('B', obs, 2026, presetOf('широкий')))[0]?.order, { kind: 'yard', cls: 'ткач' });
+  assert.deepEqual(yard(ctxOf('B', obs, 2026, presetOf('широкий+klinokTarget=0')))[0]?.order, { kind: 'yard', cls: 'ткач' });
 });
 
 test('a preset without feeding never feeds', () => {
