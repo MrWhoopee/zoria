@@ -34,10 +34,11 @@ export function guard(ctx: Ctx): Task[] {
   const klinoks = w.units.filter((u) => u.cls === 'клинок' && !midStep(u) && !u.stuck);
   if (klinoks.length === 0) return [];
   const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
-  const heatable = new Set(w.mine.map((n) => keyOf(n)).filter((k) => !starts.has(k)));
+  const grace = cfg(v, 'capGrace');
+  const heatable = new Set(w.mine.map((n) => keyOf(n)).filter((k) => !starts.has(k) && w.t - (w.since.get(k) ?? w.t) >= grace));
   const chasing = new Set(w.units.flatMap((k) => (k.cls === 'клинок' && k.task?.ram ? [k.task.ram] : [])));
   const threats = w.foe
-    .filter((f) => f.cls === 'ткач' && f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id) && heatable.has(keyOf(f)))
+    .filter((f) => f.cls === 'ткач' && f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id) && heatable.has(keyOf(f)) && w.stillFoe(f.id))
     .sort((a, b) => a.id.localeCompare(b.id));
   const tasks: Task[] = [];
   const used = new Set<string>();

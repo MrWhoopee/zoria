@@ -19,7 +19,8 @@
     "league": "node tools/league.ts",
     "replay": "node tools/replay.ts",
     "league:report": "node tools/league-report.ts",
-    "mutate": "node tools/mutate.ts"
+    "mutate": "node tools/mutate.ts",
+    "inspect": "node tools/inspect.ts"
   },
   "zaria": {
     "bot": "node dist/main.js",

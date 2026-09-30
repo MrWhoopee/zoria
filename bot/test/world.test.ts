@@ -108,3 +108,28 @@ test('a ring needle pulls with the ring multiplier whoever holds it', () => {
   w.update(makeObs({ t: 5, own: [{ q: ring.q, r: ring.r, owner: 'A', dark: false }] }));
   assert.equal(w.foeLit().find((s) => keyOf(s.cell) === keyOf(ring))?.mult, v.cfg['ringPull']);
 });
+
+test('world remembers when each of our needles became ours', () => {
+  const v = valleyOf('B');
+  const w = new World(v);
+  const [r0] = v.ruins;
+  assert.ok(r0);
+  w.update(makeObs({ t: 10, mine: { ...makeObs().mine, needles: [{ q: 7, r: 5, dark: false, fed: false, weight: 1 }] } }));
+  assert.equal(w.since.get('7,5'), -Infinity);
+  w.update(makeObs({ t: 20, mine: { ...makeObs().mine, needles: [{ q: 7, r: 5, dark: false, fed: false, weight: 1 }, { q: r0.q, r: r0.r, dark: false, fed: false, weight: 1 }] } }));
+  assert.equal(w.since.get(keyOf(r0)), 20);
+  w.update(makeObs({ t: 30, mine: { ...makeObs().mine, needles: [{ q: 7, r: 5, dark: false, fed: false, weight: 1 }, { q: r0.q, r: r0.r, dark: false, fed: false, weight: 1 }] } }));
+  assert.equal(w.since.get(keyOf(r0)), 20);
+  w.update(makeObs({ t: 40, mine: { ...makeObs().mine, needles: [{ q: 7, r: 5, dark: false, fed: false, weight: 1 }] } }));
+  assert.equal(w.since.has(keyOf(r0)), false);
+});
+
+test('world remembers where each foe stood on the previous tick', () => {
+  const w = new World(valleyOf('B'));
+  w.update(makeObs({ t: 10, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] }));
+  assert.equal(w.stillFoe('T-A3'), false);
+  w.update(makeObs({ t: 11, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] }));
+  assert.equal(w.stillFoe('T-A3'), true);
+  w.update(makeObs({ t: 12, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 4 }] }));
+  assert.equal(w.stillFoe('T-A3'), false);
+});

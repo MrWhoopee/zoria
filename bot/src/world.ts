@@ -21,6 +21,9 @@ export class World {
   owner = new Map<string, ActorName | null>();
   dark = new Map<string, boolean>();
   seen = new Map<string, number>();
+  since = new Map<string, number>();
+  private foeAt = new Map<string, string>();
+  private foeWas = new Map<string, string>();
 
   constructor(v: Valley) {
     this.v = v;
@@ -40,6 +43,8 @@ export class World {
     this.units = obs.mine.units;
     this.mine = obs.mine.needles;
     this.foe = obs.foe;
+    this.foeWas = this.foeAt;
+    this.foeAt = new Map(obs.foe.map((f) => [f.id, key(f.q, f.r)]));
     this.order = obs.pub.order;
     this.hold = obs.mine.order;
     for (const e of obs.own) {
@@ -59,12 +64,20 @@ export class World {
       this.owner.set(k, l ? l.owner : null);
       if (l) this.dark.set(k, l.dark);
     }
+    const starts = new Set(this.v.starts.map((s) => keyOf(s.cell)));
+    for (const k of [...this.since.keys()]) if (!held.has(k)) this.since.delete(k);
+    for (const k of held) if (!this.since.has(k)) this.since.set(k, starts.has(k) ? -Infinity : obs.t);
     for (const n of obs.mine.needles) {
       const k = key(n.q, n.r);
       this.owner.set(k, slot);
       this.dark.set(k, n.dark);
       this.seen.set(k, obs.t);
     }
+  }
+
+  stillFoe(id: string): boolean {
+    const now = this.foeAt.get(id);
+    return now !== undefined && now === this.foeWas.get(id);
   }
 
   ownLit(): Cell[] {
