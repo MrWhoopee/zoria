@@ -34,3 +34,14 @@ test('strategy lists every preset', () => {
   assert.ok(presets().includes('основний'));
   assert.ok(createStrategy('скупий'));
 });
+
+test('preset names accept knob overrides', () => {
+  const p = presetOf('скупий+steal=0+unlock=0.25+feed=1');
+  assert.equal(p.tkachTarget, 2);
+  assert.equal(p.steal, 0);
+  assert.equal(p.unlock, 0.25);
+  assert.equal(p.feed, true);
+  assert.equal(p.name, 'скупий+steal=0+unlock=0.25+feed=1');
+  assert.throws(() => presetOf('скупий+nosuch=1'));
+  assert.throws(() => presetOf('скупий+steal=x'));
+});

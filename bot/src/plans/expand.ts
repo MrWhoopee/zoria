@@ -91,11 +91,12 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
   const free = (k: string): boolean => !reserved.has(k) && !banned(ctx, k);
   const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
   const cut = cutNeedles(ctx, anchors);
-  const back = (c: Cell): number => reconnectValue(ctx, c, anchors, own, foe, cut);
+  const back = (c: Cell): number => preset.repair * reconnectValue(ctx, c, anchors, own, foe, cut);
   for (const [k, o] of w.owner) {
     if (o === v.slot || starts.has(k) || !free(k)) continue;
     const keeper = o === 'K';
     if (keeper && w.t < v.dawnAt) continue;
+    if (o !== null && !keeper && preset.steal === 0) continue;
     const c = parse(k);
     if (!links.reach(c, anchors)) continue;
     if (o === null) {

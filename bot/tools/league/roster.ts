@@ -1,7 +1,7 @@
 import { ARCHETYPES } from '@zoria/sdk';
 import type { PackSeat } from '@zoria/sdk';
 import { NAKAZ_SAMPLES, createNakazSparring } from '@zoria/sdk/nakaz';
-import { PRESETS } from '../../src/preset.ts';
+import { PRESETS, presetOf } from '../../src/preset.ts';
 import { createStrategy } from '../../src/strategy.ts';
 
 export type SeatKind = 'preset' | 'archetype' | 'mutant' | 'nakaz';
@@ -10,7 +10,10 @@ const archetypes = ARCHETYPES as Record<string, Record<string, unknown>>;
 const samples = NAKAZ_SAMPLES as Record<string, string>;
 
 export function kindOf(name: string): SeatKind {
-  if (name in PRESETS) return 'preset';
+  if (name in PRESETS || (name.includes('+') && (name.split('+')[0] ?? '') in PRESETS)) {
+    presetOf(name);
+    return 'preset';
+  }
   if (name in archetypes) return 'archetype';
   if (name in samples) return 'nakaz';
   const base = name.split('+')[0] ?? '';
