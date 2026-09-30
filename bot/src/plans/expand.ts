@@ -88,7 +88,8 @@ export function reconnectValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull,
 export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<string>): Site[] {
   const { v, w, links, memo, preset } = ctx;
   const out: Site[] = [];
-  const free = (k: string): boolean => !reserved.has(k) && !banned(ctx, k);
+  const guarded = w.t < v.dawnAt;
+  const free = (k: string): boolean => !reserved.has(k) && !banned(ctx, k) && !(guarded && dist(parse(k), v.citadel) <= v.cherta);
   const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
   const cut = cutNeedles(ctx, anchors);
   const back = (c: Cell): number => preset.repair * reconnectValue(ctx, c, anchors, own, foe, cut);
@@ -187,6 +188,12 @@ function nearestHome(anchors: Cell[], u: Cell): Cell {
   return best;
 }
 
+function walkHome(ctx: Ctx, u: MineUnit): number {
+  const anchors = [ctx.v.base, ...ctx.w.ownLit()];
+  const home = nearestHome(anchors, u);
+  return Math.max(0, dist(home, u) - 3) * cfg(ctx.v, 'stepTkach');
+}
+
 function leashRisk(ctx: Ctx, u: MineUnit): boolean {
   const r = ctx.memo.res.get(u.id);
   const autonomy = cfg(ctx.v, 'autonomy');
@@ -194,7 +201,7 @@ function leashRisk(ctx: Ctx, u: MineUnit): boolean {
     const left = (r.work ?? 0) - (ctx.w.t - (r.arrived ?? ctx.w.t));
     return u.away > 0 && u.away + Math.max(0, left) >= autonomy - 2;
   }
-  return u.away >= AWAY_LIMIT;
+  return u.away >= AWAY_LIMIT || (u.away > 0 && u.away + walkHome(ctx, u) >= autonomy - 4);
 }
 
 function overstayed(ctx: Ctx, u: MineUnit): void {

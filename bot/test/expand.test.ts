@@ -220,3 +220,19 @@ test('a Tkach heating on target is not pulled home while the heat fits the leash
   assert.equal(expand(late)[0]?.order.kind, 'move');
   late.memo.res.clear();
 });
+
+test('no target inside the Keeper line before dawn', () => {
+  const ctx = ctxOf('B', makeObs({ t: 300, pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
+  const inner = { q: 2, r: 1 };
+  ctx.w.owner.set('2,1', 'A');
+  const all = sites(ctx, [ctx.v.base, ...ctx.w.ownLit(), { q: 4, r: 2 }], new Map(), new Map(), new Set());
+  assert.ok(all.every((s) => Math.max(Math.abs(s.cell.q), Math.abs(s.cell.r), Math.abs(s.cell.q + s.cell.r)) > ctx.v.cherta));
+  assert.ok(inner);
+});
+
+test('the leash counts the walk home', () => {
+  const far = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', -6, 12, { away: 22 })] } }));
+  assert.equal(expand(far)[0]?.tag, 'expand:home');
+  const near = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 8, 8, { away: 22 })] } }));
+  assert.ok(expand(near).every((t) => t.tag !== 'expand:home'));
+});
