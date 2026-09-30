@@ -33,16 +33,15 @@ export function guard(ctx: Ctx): Task[] {
   const { v, w } = ctx;
   const klinoks = w.units.filter((u) => u.cls === 'клинок' && !midStep(u) && !u.stuck);
   if (klinoks.length === 0) return [];
-  const mine = w.mine.map((n) => ({ q: n.q, r: n.r }));
-  const chasing = new Set(klinoks.flatMap((k) => (k.task?.ram ? [k.task.ram] : [])));
+  const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
+  const heatable = new Set(w.mine.map((n) => keyOf(n)).filter((k) => !starts.has(k)));
+  const chasing = new Set(w.units.flatMap((k) => (k.cls === 'клинок' && k.task?.ram ? [k.task.ram] : [])));
   const threats = w.foe
-    .filter((f) => f.cls === 'ткач' && f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id))
-    .map((f) => ({ f, d: Math.min(...mine.map((c) => dist(c, f))) }))
-    .filter((x) => x.d <= 1)
-    .sort((a, b) => a.d - b.d || a.f.id.localeCompare(b.f.id));
+    .filter((f) => f.cls === 'ткач' && f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id) && heatable.has(keyOf(f)))
+    .sort((a, b) => a.id.localeCompare(b.id));
   const tasks: Task[] = [];
   const used = new Set<string>();
-  for (const { f } of threats) {
+  for (const f of threats) {
     const free = klinoks.filter((k) => !used.has(k.id) && !k.task?.ram).sort((a, b) => dist(a, f) - dist(b, f) || a.id.localeCompare(b.id));
     const k = free[0];
     if (!k) break;

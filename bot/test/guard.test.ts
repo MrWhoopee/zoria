@@ -12,7 +12,8 @@ function klinok(id: string, q: number, r: number, over: Partial<MineUnit> = {}):
 }
 
 test('a Klinok rams a foe Tkach standing on our needle', () => {
-  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 7, r: 5 }] });
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] });
   const tasks = guard(ctxOf('B', obs));
   assert.deepEqual(tasks[0]?.order, { kind: 'ram', unit: 'K-B7', target: 'T-A3' });
 });
@@ -41,4 +42,21 @@ test('an idle Klinok far from the network returns to a central needle', () => {
     assert.equal(o.home, true);
     assert.ok((o.q === 7 && o.r === 5) || (o.q === 5 && o.r === 7));
   }
+});
+
+test('a foe chased by a Klinok mid-step is not given to a second Klinok', () => {
+  const chase = { goal: null, site: null, feed: null, jam: null, ram: 'T-A3', home: false, path: 2 };
+  const units = [klinok('K-B7', 6, 7, { wait: 1, task: chase }), klinok('K-B8', 6, 6)];
+  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles: starts, units }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 7, r: 5 }] });
+  assert.ok(guard(ctxOf('B', obs)).every((t) => t.order.kind !== 'ram'));
+});
+
+test('a foe Tkach only passing by, or on a start needle it cannot heat, is not rammed', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const passing = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 2 }] });
+  assert.ok(guard(ctxOf('B', passing)).every((t) => t.order.kind !== 'ram'));
+  const onStart = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 7, r: 5 }] });
+  assert.ok(guard(ctxOf('B', onStart)).every((t) => t.order.kind !== 'ram'));
+  const onOurs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'T-A3', p: 'A', cls: 'ткач', q: 9, r: 3 }] });
+  assert.equal(guard(ctxOf('B', onOurs))[0]?.order.kind, 'ram');
 });
