@@ -39,8 +39,11 @@ export function guard(ctx: Ctx): Task[] {
   const grace = preset.ramGrace > 0 ? cfg(v, 'capGrace') : 0;
   const heatable = new Set(w.mine.map((n) => keyOf(n)).filter((k) => !starts.has(k) && w.t - (w.since.get(k) ?? w.t) >= grace));
   const chasing = new Set(w.units.flatMap((k) => (k.cls === 'клинок' && k.task?.ram ? [k.task.ram] : [])));
-  const threats = w.foe
-    .filter((f) => f.cls === 'ткач' && f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id) && heatable.has(keyOf(f)) && w.stillFor(f.id) >= preset.ramStill)
+  const dark = w.mine.filter((n) => n.dark);
+  const heaters = w.foe.filter((f) => f.cls === 'ткач' && heatable.has(keyOf(f)) && w.stillFor(f.id) >= preset.ramStill);
+  const jammers = w.foe.filter((f) => f.cls === 'клинок' && dark.some((n) => dist(n, f) <= 1));
+  const threats = [...heaters, ...jammers]
+    .filter((f) => f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id))
     .sort((a, b) => a.id.localeCompare(b.id));
   const tasks: Task[] = [];
   const used = new Set<string>();
