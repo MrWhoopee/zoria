@@ -11,6 +11,7 @@ const CODE: [string, string][] = [
   ['yard', 'src/plans/yard.ts'],
   ['expand', 'src/plans/expand.ts'],
   ['guard', 'src/plans/guard.ts'],
+  ['jam', 'src/plans/jam.ts'],
   ['keepalive', 'src/plans/keepalive.ts'],
 ];
 

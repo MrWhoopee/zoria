@@ -41,6 +41,10 @@ export function release(ctx: Ctx): void {
       if (!unit || unit.away === 0) memo.res.delete(id);
       continue;
     }
+    if (r.kind === 'jam') {
+      if (!unit) memo.res.delete(id);
+      continue;
+    }
     if (r.kind === 'stage') {
       if (!unit || w.t >= v.dawnAt) memo.res.delete(id);
       continue;

@@ -8,7 +8,7 @@ import type { Valley } from '../map/valley.ts';
 import type { World } from '../world.ts';
 
 export interface Reservation {
-  kind: 'take' | 'build' | 'feed' | 'home' | 'stage';
+  kind: 'take' | 'build' | 'feed' | 'home' | 'stage' | 'jam';
   cell: Cell;
   since: number;
   sent: number;
@@ -16,6 +16,8 @@ export interface Reservation {
   work?: number;
   arrived?: number;
   muted?: number;
+  stand?: Cell;
+  mark?: number;
 }
 
 export interface Memo {

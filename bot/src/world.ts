@@ -13,6 +13,8 @@ export class World {
   chanAt = 0;
   ear = 0;
   minutes = 0;
+  stolen = 0;
+  score: [number, number, number] = [0, 0, 0];
   units: MineUnit[] = [];
   mine: MineNeedle[] = [];
   foe: FoeEntry[] = [];
@@ -40,6 +42,8 @@ export class World {
     this.chanAt = obs.pulse.chanAt;
     this.ear = obs.pulse.ear;
     this.minutes = obs.pulse.minutes;
+    this.stolen = obs.mine.ledger.stolen;
+    this.score = obs.pub.score;
     this.units = obs.mine.units;
     this.mine = obs.mine.needles;
     this.foe = obs.foe;
