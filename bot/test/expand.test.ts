@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Order } from '@zoria/protocol';
 import { dist, keyOf } from '../src/hex.ts';
-import { expand, reconnectValue, release, unlockValue } from '../src/plans/expand.ts';
+import { expand, reconnectValue, release, sites, unlockValue } from '../src/plans/expand.ts';
 import { presetOf } from '../src/preset.ts';
 import { ctxOf } from './ctx.ts';
 import { makeObs, tkach } from './obs.ts';
@@ -152,4 +152,20 @@ test('a repair site is worth the cut needles it reconnects', () => {
   assert.ok(site);
   assert.ok(reconnectValue(ctx, site, anchors, new Map(), new Map()) > 0);
   assert.equal(reconnectValue(ctx, ctx.v.base, anchors, new Map(), new Map()), 0);
+});
+
+test('retaking a captured link is worth the branch it reconnects', () => {
+  const probe = ctxOf('B', makeObs());
+  const anchors = [probe.v.base, { q: 7, r: 5 }, { q: 5, r: 7 }];
+  const link = probe.v.ruins.find((r) => probe.links.reach(r, anchors) && probe.v.ruins.some((x) => !probe.links.reach(x, anchors) && probe.links.ok(r, x)));
+  assert.ok(link);
+  const cut = probe.v.ruins.find((x) => !probe.links.reach(x, anchors) && probe.links.ok(link, x));
+  assert.ok(cut);
+  const needles = [...starts, { q: cut.q, r: cut.r, dark: true, fed: false, weight: 0 }];
+  const own = [{ q: link.q, r: link.r, owner: 'A' as const, dark: false }];
+  const units = [tkach('T-B6', 6, 6)];
+  const ctx = ctxOf('B', makeObs({ t: 300, pulse: { ...makeObs().pulse, energy: 0 }, own, mine: { ...makeObs().mine, needles, units } }));
+  const plain = ctxOf('B', makeObs({ t: 300, pulse: { ...makeObs().pulse, energy: 0 }, own, mine: { ...makeObs().mine, needles: starts, units } }));
+  const valueOf = (c: typeof ctx): number => sites(c, [c.v.base, ...c.w.ownLit()], new Map(), new Map(), new Set()).find((s) => s.cell.q === link.q && s.cell.r === link.r)?.gain ?? 0;
+  assert.ok(valueOf(ctx) > valueOf(plain));
 });

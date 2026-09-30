@@ -52,9 +52,13 @@ export function unlockValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull, fo
   return total;
 }
 
-export function reconnectValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull, foe: Pull): number {
-  const { v, w, links } = ctx;
-  const cut = w.mine.filter((n) => n.dark).map((n) => ({ q: n.q, r: n.r })).filter((c) => !links.reach(c, anchors));
+function cutNeedles(ctx: Ctx, anchors: Cell[]): Cell[] {
+  return ctx.w.mine.filter((n) => n.dark).map((n) => ({ q: n.q, r: n.r })).filter((c) => !ctx.links.reach(c, anchors));
+}
+
+export function reconnectValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull, foe: Pull, cut: Cell[] = cutNeedles(ctx, anchors)): number {
+  const { v, links } = ctx;
+  if (cut.length === 0) return 0;
   const reached = new Set<string>();
   const queue = cut.filter((c) => links.ok(site, c));
   let total = 0;
@@ -68,11 +72,13 @@ export function reconnectValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull,
   return total;
 }
 
-function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<string>): Site[] {
+export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<string>): Site[] {
   const { v, w, links, memo, preset } = ctx;
   const out: Site[] = [];
   const free = (k: string): boolean => !reserved.has(k) && !memo.banned.has(k);
   const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
+  const cut = cutNeedles(ctx, anchors);
+  const back = (c: Cell): number => reconnectValue(ctx, c, anchors, own, foe, cut);
   for (const [k, o] of w.owner) {
     if (o === v.slot || starts.has(k) || !free(k)) continue;
     const keeper = o === 'K';
@@ -80,13 +86,13 @@ function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<st
     const c = parse(k);
     if (!links.reach(c, anchors)) continue;
     if (o === null) {
-      out.push({ cell: c, kind: 'take', gain: gain(v, c, own, foe), work: cfg(v, 'heatNeedle'), owner: null });
+      out.push({ cell: c, kind: 'take', gain: gain(v, c, own, foe) + back(c), work: cfg(v, 'heatNeedle'), owner: null });
       continue;
     }
     const dark = keeper || w.dark.get(k) === true;
     const mult = dark ? 0 : 1;
     const work = keeper ? cfg(v, 'heatNeedle') : dark ? cfg(v, 'heatDark') : cfg(v, 'heatEnemy');
-    out.push({ cell: c, kind: 'take', gain: takeGain(v, c, own, foe, mult, preset.harm), work, owner: o });
+    out.push({ cell: c, kind: 'take', gain: takeGain(v, c, own, foe, mult, preset.harm) + back(c), work, owner: o });
   }
   const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
   const need = cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0);
@@ -99,7 +105,7 @@ function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<st
         if (seen.has(k) || dist(a, c) < 3) continue;
         seen.add(k);
         if (!inside(v, c) || !free(k) || !buildable(ctx, c) || !links.reach(c, anchors)) continue;
-        const value = gain(v, c, own, foe) + preset.unlock * unlockValue(ctx, c, anchors, own, foe) + reconnectValue(ctx, c, anchors, own, foe);
+        const value = gain(v, c, own, foe) + preset.unlock * unlockValue(ctx, c, anchors, own, foe) + back(c);
         out.push({ cell: c, kind: 'build', gain: value, work: cfg(v, 'buildTicks'), owner: null });
       }
     }
