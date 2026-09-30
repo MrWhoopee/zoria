@@ -1,9 +1,11 @@
-import type { ActorName, FoeEntry, MineNeedle, MineUnit, Observe, OrderBoard, OrderProgress } from '@zoria/protocol';
+import type { ActorName, FoeEntry, SlotName, MineNeedle, MineUnit, Observe, OrderBoard, OrderProgress } from '@zoria/protocol';
 import { key, keyOf, parse } from './hex.ts';
 import type { Cell } from './hex.ts';
 import type { Source } from './map/coverage.ts';
 import { cfg } from './map/valley.ts';
 import type { Valley } from './map/valley.ts';
+
+const SLOTS: readonly SlotName[] = ['A', 'B', 'C'];
 
 export class World {
   readonly v: Valley;
@@ -15,6 +17,11 @@ export class World {
   minutes = 0;
   stolen = 0;
   score: [number, number, number] = [0, 0, 0];
+  partner: SlotName | null = null;
+  offers: SlotName[] = [];
+  offered: SlotName[] = [];
+  breaking = false;
+  offersLeft = 0;
   units: MineUnit[] = [];
   mine: MineNeedle[] = [];
   foe: FoeEntry[] = [];
@@ -44,6 +51,12 @@ export class World {
     this.minutes = obs.pulse.minutes;
     this.stolen = obs.mine.ledger.stolen;
     this.score = obs.pub.score;
+    const link = obs.pub.pact.active.find((x) => x.a === this.v.slot || x.b === this.v.slot);
+    this.partner = link ? (link.a === this.v.slot ? link.b : link.a) : null;
+    this.offers = obs.mine.pact.in.map((o) => o.who);
+    this.offered = obs.mine.pact.out.map((o) => o.who);
+    this.breaking = obs.pub.pact.breaks.some((x) => x.a === this.v.slot || x.b === this.v.slot);
+    this.offersLeft = obs.mine.pact.offersLeft;
     this.units = obs.mine.units;
     this.mine = obs.mine.needles;
     this.foe = obs.foe;
@@ -84,6 +97,16 @@ export class World {
       this.dark.set(k, n.dark);
       this.seen.set(k, obs.t);
     }
+  }
+
+  scoreOf(s: SlotName): number {
+    return this.score[SLOTS.indexOf(s)] ?? 0;
+  }
+
+  leader(): SlotName {
+    let best: SlotName = 'A';
+    for (const s of SLOTS) if (this.scoreOf(s) > this.scoreOf(best)) best = s;
+    return best;
   }
 
   stillFor(id: string): number {

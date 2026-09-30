@@ -115,7 +115,7 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
   const cut = cutNeedles(ctx, anchors);
   const back = (c: Cell): number => preset.repair * reconnectValue(ctx, c, anchors, own, foe, cut);
   for (const [k, o] of w.owner) {
-    if (o === v.slot || starts.has(k) || !free(k)) continue;
+    if (o === v.slot || (o !== null && o === w.partner) || starts.has(k) || !free(k)) continue;
     const keeper = o === 'K';
     if (keeper && w.t < v.dawnAt) continue;
     if (o !== null && !keeper && preset.steal === 0) continue;

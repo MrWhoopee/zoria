@@ -24,19 +24,8 @@ interface Target {
 const none = (): void => undefined;
 
 function leader(ctx: Ctx): ActorName | null {
-  const { v, w } = ctx;
-  const slots = ['A', 'B', 'C'] as const;
-  let best: ActorName | null = null;
-  let top = w.score[slots.indexOf(v.slot)] ?? 0;
-  for (let i = 0; i < slots.length; i++) {
-    const s = slots[i];
-    const x = w.score[i] ?? 0;
-    if (s && s !== v.slot && x > top) {
-      top = x;
-      best = s;
-    }
-  }
-  return best;
+  const lead = ctx.w.leader();
+  return lead === ctx.v.slot ? null : lead;
 }
 
 function foeNet(ctx: Ctx, owner: ActorName): Cell[] {
@@ -115,7 +104,7 @@ function targets(ctx: Ctx, reserved: Set<string>): Target[] {
   const foe = pullOf(v, w.foeLit());
   const out: Target[] = [];
   for (const [k, o] of w.owner) {
-    if (o === null || o === v.slot || o === 'K' || starts.has(k) || reserved.has(k) || w.dark.get(k) === true) continue;
+    if (o === null || o === v.slot || o === 'K' || o === w.partner || starts.has(k) || reserved.has(k) || w.dark.get(k) === true) continue;
     if ((memo.banned.get('jam:' + k) ?? -1) > w.t) continue;
     const cell = parse(k);
     const weight = o === lead ? ctx.preset.jamLeader : 1;

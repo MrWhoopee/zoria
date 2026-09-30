@@ -9,6 +9,7 @@ import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
 import { guard } from './plans/guard.ts';
 import { jam } from './plans/jam.ts';
+import { pact } from './plans/pact.ts';
 import { keepalive } from './plans/keepalive.ts';
 import { newMemo } from './plans/types.ts';
 import { presetOf } from './preset.ts';
@@ -36,7 +37,7 @@ export class Brain {
   private sentAt = 0;
   private record: DecisionRecord = { t: 0, offered: 0, errors: 0, chosen: [] };
 
-  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand, jam], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
+  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand, jam, pact], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
     this.world = new World(v);
     this.ctx = { v, w: this.world, links, memo: this.memo, preset };
     this.advisors = advisors;

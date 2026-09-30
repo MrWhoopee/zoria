@@ -43,7 +43,7 @@ export function guard(ctx: Ctx): Task[] {
   const heaters = w.foe.filter((f) => f.cls === 'ткач' && heatable.has(keyOf(f)) && w.stillFor(f.id) >= preset.ramStill);
   const jammers = preset.ramJammers > 0 ? w.foe.filter((f) => f.cls === 'клинок' && dark.some((n) => dist(n, f) <= 1)) : [];
   const threats = [...heaters, ...jammers]
-    .filter((f) => f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id))
+    .filter((f) => f.p !== v.slot && f.p !== 'K' && f.p !== w.partner && !chasing.has(f.id))
     .sort((a, b) => a.id.localeCompare(b.id));
   const tasks: Task[] = [];
   const used = new Set<string>();
