@@ -8,7 +8,7 @@ import type { Mutant } from './mutate/ops.ts';
 const { values } = parseArgs({
   options: {
     files: { type: 'string', default: '' },
-    workers: { type: 'string', default: '6' },
+    workers: { type: 'string', default: '4' },
     every: { type: 'string', default: '1' },
     timeout: { type: 'string', default: '60' },
   },
@@ -46,7 +46,7 @@ const copies = Array.from({ length: width }, (_, i) => {
 
 function runTests(dir: string): Promise<boolean> {
   return new Promise((done) => {
-    const child = spawn(process.execPath, ['--test', 'test/**/*.test.ts'], { cwd: dir, stdio: 'ignore' });
+    const child = spawn(process.execPath, ['--test', '--test-concurrency=1', 'test/**/*.test.ts'], { cwd: dir, stdio: 'ignore' });
     const timer = setTimeout(() => child.kill(), Number(values.timeout) * 1000);
     child.on('exit', (code) => {
       clearTimeout(timer);
