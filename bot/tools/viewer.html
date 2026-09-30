@@ -1,0 +1,136 @@
+<title>Запис долини</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --ground:#10151b;--panel:#171e26;--line:#2a3440;--ink:#dfe6ee;--muted:#8b98a7;
+  --a:#f2b134;--b:#3fb8af;--c:#d06bd6;--k:#e8e8e8;
+  --sans:"Rubik",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
+}
+html,body{background:var(--ground);color:var(--ink);font-family:var(--sans)}
+.wrap{padding-inline:16px;padding-block:18px 32px;max-width:1180px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:22px;font-weight:700;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:14px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start}
+@media (max-width:860px){.main{grid-template-columns:1fr}}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:10px}
+canvas{width:100%;height:auto;display:block;aspect-ratio:1/1;max-width:100%}
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{font:500 14px var(--sans);background:#243040;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--a)}
+select{font:14px var(--sans);background:#243040;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px}
+.tick{font:600 14px var(--mono);font-variant-numeric:tabular-nums;min-width:96px}
+.side{display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:8px}
+.card h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:500}
+.row{display:grid;grid-template-columns:14px 1fr auto auto;gap:8px;align-items:center;font-size:14px}
+.sw{width:12px;height:12px;border-radius:3px}
+.num{font:13px var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.bar{height:6px;border-radius:3px;background:#243040;overflow:hidden;grid-column:2/5}
+.bar i{display:block;height:100%}
+.phase{font-size:14px;line-height:1.45}
+.legend{display:grid;grid-template-columns:22px 1fr;gap:6px 8px;font-size:13px;align-items:center;line-height:1.35}
+.legend svg{display:block}
+.note{font-size:14px;line-height:1.5;color:var(--ink);max-width:65ch}
+.note b{color:var(--a);font-weight:500}
+</style>
+<div class="wrap">
+  <header>
+    <h1 id="h1"></h1>
+    <p class="sub" id="sub"></p>
+  </header>
+  <div class="main">
+    <section class="board">
+      <canvas id="cv" width="900" height="900"></canvas>
+      <div class="ctrl">
+        <button id="play" type="button">Пуск</button>
+        <span class="tick" id="tk">такт 1</span>
+        <input id="sl" type="range" min="0" value="0" aria-label="Такт">
+        <select id="sp" aria-label="Швидкість"><option value="1">×1</option><option value="3" selected>×3</option><option value="8">×8</option></select>
+      </div>
+    </section>
+    <aside class="side">
+      <div class="card"><h2>Рахунок, хвилини</h2><div id="score" style="display:grid;gap:10px"></div></div>
+      <div class="card"><h2>Що зараз відбувається</h2><div class="phase" id="phase"></div></div>
+      <div class="card"><h2>Позначки</h2>
+        <div class="legend">
+          <svg width="18" height="18"><circle cx="9" cy="9" r="6" fill="#f2b134" stroke="#10151b" stroke-width="1.5"/></svg><span>голка, що горить (дає хвилини)</span>
+          <svg width="18" height="18"><circle cx="9" cy="9" r="5" fill="none" stroke="#f2b134" stroke-width="2"/></svg><span>голка відрізана або погасла</span>
+          <svg width="18" height="18"><circle cx="9" cy="9" r="4" fill="#6d7885"/></svg><span>руїна: нічия голка, її можна забрати</span>
+          <svg width="18" height="18"><rect x="3" y="3" width="12" height="12" fill="#f2b134" stroke="#10151b"/></svg><span>вогнище (база) гравця</span>
+          <svg width="18" height="18"><path d="M9 2 L16 15 L2 15 Z" fill="#f2b134" stroke="#10151b"/></svg><span>Ткач: будує і захоплює голки</span>
+          <svg width="18" height="18"><path d="M9 1 L16 9 L9 17 L2 9 Z" fill="#f2b134" stroke="#10151b"/></svg><span>Клинок: глушить голки, таранить машини</span>
+          <svg width="18" height="18"><path d="M3 3 L15 15 M15 3 L3 15" stroke="#ff5a5a" stroke-width="2.5"/></svg><span>голку заглушено</span>
+          <svg width="18" height="18"><circle cx="9" cy="9" r="8" fill="rgba(160,180,255,.25)"/></svg><span>шторм: команди вдвічі дорожчі</span>
+          <svg width="18" height="18"><rect x="1" y="1" width="16" height="16" fill="rgba(242,177,52,.28)"/></svg><span>підфарбовані соти: чия територія, звідки йдуть хвилини</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+  <section class="card">
+    <h2>Гра простими словами</h2>
+    <p class="note">Це не стратегія з юнітами, де армію ведуть ордою. Гроші тут — <b>хвилини зв'язку</b>: кожна твоя голка, з'єднана ланцюжком (до 5 сот між сусідами) з базою, «накриває» соти навколо себе, і вони капають хвилини щотакту. Хто на 1200-му такті має найбільше хвилин, той перший.</p>
+    <p class="note">Машин мало: сумарна «вага» рою не більше 8, Ткач важить 2, Клинок 1. Тобто максимум <b>4 Ткачі</b>, або <b>8 Клинків</b>, або суміш. Кожна машина в русі коштує 32 байти каналу за такт, а канал — лише 100–300 байтів. Тому навіть 8 машин одночасно ходити не зможуть: канал задушить.</p>
+    <p class="note">Основна робота: Ткачі забирають нічиї руїни і будують нові голки, розширюючи мережу. Бійка — це заглушити чужу голку Клинком (її хвилини йдуть тобі) або протаранити чужого Ткача. Останні 200 тактів — <b>зоря</b>: охоронець центру йде, і його кільце голок з подвійною віддачею може забрати будь-хто.</p>
+  </section>
+</div>
+<script>
+const DATA = __DATA__;
+document.getElementById('h1').textContent=DATA.title;document.getElementById('sub').textContent=DATA.sub;
+const COL={A:'#f2b134',B:'#3fb8af',C:'#d06bd6',K:'#e8e8e8'};
+const TER={bare:'#3b4450',meadow:'#3f5a3a',wood:'#2f4a36',sand:'#6b6446',marsh:'#3a4a4f',hill:'#5a4f45',water:'#1d3550',mount:'#23272d'};
+const BASES={A:[6,-12],B:[6,6],C:[-12,6]};
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const sl=document.getElementById('sl'),tk=document.getElementById('tk'),pb=document.getElementById('play'),sp=document.getElementById('sp');
+sl.max=DATA.frames.length-1;
+const S3=Math.sqrt(3);
+let size=13.2,cx=450,cy=450;
+function fit(){const w=cv.clientWidth||900;const dpr=window.devicePixelRatio||1;cv.width=Math.round(w*dpr);cv.height=Math.round(w*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);size=w/(S3*40.5);cx=w/2;cy=w/2;draw()}
+const px=(q,r)=>[cx+size*S3*(q+r/2),cy+size*1.5*r];
+function hex(x,y,s){ctx.beginPath();for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-30);const X=x+s*Math.cos(a),Y=y+s*Math.sin(a);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)}ctx.closePath()}
+const dist=(a,b,c,d)=>(Math.abs(a-c)+Math.abs(b-d)+Math.abs(a+b-c-d))/2;
+function shade(hexc,lv){const n=parseInt(hexc.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;const k=1+(lv||0)*0.09;return `rgb(${Math.min(255,r*k)|0},${Math.min(255,g*k)|0},${Math.min(255,b*k)|0})`}
+function rgba(h,a){const n=parseInt(h.slice(1),16);return `rgba(${n>>16},${n>>8&255},${n&255},${a})`}
+function draw(){
+  const f=DATA.frames[+sl.value];if(!f)return;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const pull={};
+  for(const [k,o,lit] of f.n){if(!lit||!o||o==='K'&&f.d)continue;const [q,r]=k.split(',').map(Number);for(let dq=-3;dq<=3;dq++)for(let dr=-3;dr<=3;dr++){const d=dist(0,0,dq,dr);if(d>3)continue;const key=(q+dq)+','+(r+dr);const w=d<=1?1:d===2?.66:.33;const cur=pull[key]||{};cur[o]=(cur[o]||0)+w;pull[key]=cur}}
+  for(const [q,r,t,lv] of DATA.cells){const [x,y]=px(q,r);hex(x,y,size*1.02);ctx.fillStyle=shade(TER[t]||TER.bare,lv);ctx.fill();const p=pull[q+','+r];if(p){let best=null,bv=0;for(const o in p)if(p[o]>bv){bv=p[o];best=o}ctx.fillStyle=rgba(COL[best],best==='K'?.12:.30);ctx.fill()}}
+  for(const [x,y,r] of f.st){ctx.beginPath();ctx.arc(cx+x*size,cy+y*size,r*size,0,Math.PI*2);ctx.fillStyle='rgba(160,180,255,.22)';ctx.fill()}
+  ctx.font=`600 ${Math.max(9,size*.9)}px JetBrains Mono, monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+  const FL={'схрон':'+','патрон':'◎','заводь':'~','сота':'×','відлуння':'?'};
+  for(const fd of DATA.finds){const [x,y]=px(fd.q,fd.r);ctx.fillStyle='#b9c6d6';ctx.fillText(FL[fd.kind]||'·',x,y)}
+  for(const p of ['A','B','C']){const [q,r]=BASES[p];const [x,y]=px(q,r);const s=size*.8;ctx.fillStyle=COL[p];ctx.fillRect(x-s,y-s,2*s,2*s);ctx.strokeStyle='#10151b';ctx.lineWidth=2;ctx.strokeRect(x-s,y-s,2*s,2*s)}
+  const [kx,ky]=px(0,0);ctx.fillStyle='#e8e8e8';hex(kx,ky,size*.9);ctx.fill();
+  for(const [k,o,lit,jam] of f.n){const [q,r]=k.split(',').map(Number);const [x,y]=px(q,r);ctx.beginPath();
+    if(!o){ctx.arc(x,y,size*.34,0,Math.PI*2);ctx.fillStyle='#6d7885';ctx.fill()}
+    else if(lit){ctx.arc(x,y,size*.5,0,Math.PI*2);ctx.fillStyle=COL[o];ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#10151b';ctx.stroke()}
+    else{ctx.arc(x,y,size*.42,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=COL[o];ctx.stroke()}
+    if(jam){const s=size*.55;ctx.beginPath();ctx.moveTo(x-s,y-s);ctx.lineTo(x+s,y+s);ctx.moveTo(x+s,y-s);ctx.lineTo(x-s,y+s);ctx.strokeStyle='#ff5a5a';ctx.lineWidth=2.5;ctx.stroke()}}
+  for(const [id,o,cls,q,r] of f.u){const [x,y]=px(q,r);const s=size*.62;ctx.beginPath();
+    if(cls===0){ctx.moveTo(x,y-s);ctx.lineTo(x+s,y+s*.8);ctx.lineTo(x-s,y+s*.8)}else{ctx.moveTo(x,y-s);ctx.lineTo(x+s*.8,y);ctx.lineTo(x,y+s);ctx.lineTo(x-s*.8,y)}
+    ctx.closePath();ctx.fillStyle=COL[o]||'#fff';ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#10151b';ctx.stroke()}
+  tk.textContent='такт '+f.t;
+  const mx=Math.max(1,...f.m);
+  document.getElementById('score').innerHTML=['A','B','C'].map((p,i)=>{const cnt=f.u.filter(u=>u[1]===p);const tk=cnt.filter(u=>u[2]===0).length,kl=cnt.length-tk;const nd=f.n.filter(n=>n[1]===p&&n[2]).length;
+    return `<div class="row"><span class="sw" style="background:${COL[p]}"></span><span>${DATA.names[p]}</span><span class="num">${f.m[i].toFixed(1)}</span><span class="num" style="color:var(--muted)">⚡${f.e[i]}</span><div class="bar"><i style="width:${f.m[i]/mx*100}%;background:${COL[p]}"></i></div><span></span><span style="grid-column:2/5;font-size:12px;color:var(--muted)">голок горить ${nd} · Ткачів ${tk} · Клинків ${kl}</span></div>`}).join('');
+  const t=f.t;let ph;
+  if(t<60)ph='Старт. У кожного база, дві стартові голки і 120 заряду. Верф випускає першого Ткача (коштує 90).';
+  else if(t<400)ph='Розбір руїн. Ткачі біжать до найближчих нічиїх руїн (сірі точки) і за 8 тактів прогріву роблять їх своїми. Мережа росте, територія підфарбовується.';
+  else if(t<1000)ph='Боротьба за чуже. Вільні руїни закінчились: гравці гріють чужі голки (24 такти), глушать їх Клинками (червоний хрестик), б\'ються за замовлення і лоти.';
+  else ph='Зоря! Охоронець центру пішов, його кільце (білі голки навколо центру) нічиє і дає вдвічі більше. Хто встигне забрати — отримає великий приріст у фіналі.';
+  document.getElementById('phase').textContent=ph;
+}
+let timer=null;
+function step(){if(+sl.value>=+sl.max){stop();return}sl.value=+sl.value+1;draw()}
+function stop(){clearInterval(timer);timer=null;pb.textContent='Пуск'}
+pb.onclick=()=>{if(timer){stop();return}if(+sl.value>=+sl.max)sl.value=0;pb.textContent='Пауза';timer=setInterval(step,Math.max(16,150/ +sp.value))};
+sp.onchange=()=>{if(timer){stop();pb.click()}};
+sl.oninput=draw;
+window.addEventListener('resize',fit);
+sl.value=Math.round(sl.max*0.5);
+fit();
+</script>

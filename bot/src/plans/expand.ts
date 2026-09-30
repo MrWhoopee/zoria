@@ -7,7 +7,6 @@ import { travelField } from '../map/travel.ts';
 import { cfg, inside, price, typeAt } from '../map/valley.ts';
 import { bytesFor } from './types.ts';
 import type { Ctx, Reservation, Task } from './types.ts';
-import { TKACH_TARGET } from './yard.ts';
 
 export const RESERVE_TTL = 200;
 export const REISSUE_GAP = 6;
@@ -48,7 +47,7 @@ function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<st
     out.push({ cell: c, kind: 'take', gain: gain(v, c, own, foe) });
   }
   const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
-  const need = cfg(v, 'costNeedle') + (tkachs < TKACH_TARGET ? cfg(v, 'costTkach') : 0);
+  const need = cfg(v, 'costNeedle') + ctx.preset.buildReserve + (tkachs < ctx.preset.tkachTarget ? cfg(v, 'costTkach') : 0);
   if (w.energy >= need) {
     const seen = new Set<string>();
     const range = cfg(v, 'linkRange');
@@ -143,7 +142,7 @@ export function expand(ctx: Ctx): Task[] {
       const travel = field.get(k);
       if (travel === undefined) continue;
       const eta = travel + cfg(v, s.kind === 'take' ? 'heatNeedle' : 'buildTicks');
-      const score = (s.gain * rate * Math.max(0, left - eta)) / (eta + 1);
+      const score = (s.gain * rate * Math.max(0, left - eta)) / Math.pow(eta + 1, ctx.preset.etaPower);
       if (score > bestScore) {
         bestScore = score;
         best = s;
@@ -154,7 +153,7 @@ export function expand(ctx: Ctx): Task[] {
       tasks.push(taskFor(ctx, u, best.kind, best.cell, siteOrder(u.id, best), bestScore, -1));
       continue;
     }
-    if (memo.res.has(u.id)) continue;
+    if (memo.res.has(u.id) || !ctx.preset.feed) continue;
     const f = feedCell(ctx, taken);
     if (!f) continue;
     taken.add(keyOf(f));

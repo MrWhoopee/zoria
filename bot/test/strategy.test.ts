@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeOrders } from '@zoria/protocol';
-import { createStrategy, presets } from '../src/strategy.ts';
+import { createStrategy } from '../src/strategy.ts';
 import { manifestBytes } from './fixture.ts';
 
 test('garbage observe bytes give an empty orders frame', () => {
@@ -10,10 +10,6 @@ test('garbage observe bytes give an empty orders frame', () => {
   const out = s.tick(new Uint8Array([1, 2, 3]));
   assert.deepEqual(decodeOrders(out), []);
   assert.equal(s.belief(null)?.t, 0);
-});
-
-test('presets name our single head', () => {
-  assert.deepEqual(presets(), ['основний']);
 });
 
 test('init rejects a broken manifest', () => {

@@ -8,6 +8,8 @@ import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
 import { keepalive } from './plans/keepalive.ts';
 import { newMemo } from './plans/types.ts';
+import { presetOf } from './preset.ts';
+import type { Preset } from './preset.ts';
 import type { Advisor, Ctx, Memo, Task } from './plans/types.ts';
 import { yard } from './plans/yard.ts';
 import { World } from './world.ts';
@@ -30,9 +32,9 @@ export class Brain {
   private sent: Task[] = [];
   private sentAt = 0;
 
-  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, expand], clock: () => number = () => performance.now()) {
+  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, expand], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
     this.world = new World(v);
-    this.ctx = { v, w: this.world, links, memo: this.memo };
+    this.ctx = { v, w: this.world, links, memo: this.memo, preset };
     this.advisors = advisors;
     this.clock = clock;
   }
