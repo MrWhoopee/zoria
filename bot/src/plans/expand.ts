@@ -152,7 +152,6 @@ function taskFor(ctx: Ctx, u: MineUnit, c: Claim, value: number, since: number):
     order,
     value,
     bytes: bytesFor(ctx, order.kind, u),
-    hands: u.task === null ? cfg(ctx.v, 'chanTick') : 0,
     energy: 0,
     commit: (m, t) => {
       m.res.set(u.id, { kind: c.kind, cell: c.cell, since: since < 0 ? t : since, sent: t, owner: c.owner, work: c.work });

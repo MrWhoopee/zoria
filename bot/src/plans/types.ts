@@ -42,7 +42,6 @@ export interface Task {
   order: Order;
   value: number;
   bytes: number;
-  hands: number;
   energy: number;
   commit(memo: Memo, t: number): void;
   refused(memo: Memo, code: number): void;

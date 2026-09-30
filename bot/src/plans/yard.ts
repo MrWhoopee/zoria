@@ -18,7 +18,6 @@ export function yard(ctx: Ctx): Task[] {
       order: { kind: 'yard', cls: 'ткач' },
       value: 1e6,
       bytes: bytesFor(ctx, 'yard', v.base),
-      hands: 0,
       energy: cost,
       commit: (m, t) => {
         m.pendingYard.push(t + eta);

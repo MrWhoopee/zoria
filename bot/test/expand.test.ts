@@ -24,7 +24,6 @@ test('an idle Tkach goes to a linked ruin with a heating goal', () => {
   assert.ok(ctx.v.ruins.some((c) => keyOf(c) === k));
   assert.ok(ctx.links.reach({ q: Number(k.split(',')[0]), r: Number(k.split(',')[1]) }, [ctx.v.base, ...ctx.w.ownLit()]));
   if (o?.kind === 'move') assert.deepEqual(o.goal, { q: o.q, r: o.r });
-  assert.equal(tasks[0]?.hands, 32);
 });
 
 test('two Tkachs never share a target and commit reserves it', () => {

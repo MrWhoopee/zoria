@@ -1,9 +1,8 @@
 import { performance } from 'node:perf_hooks';
 import { orderCap } from '@zoria/protocol';
 import type { ChannelCfg, Observe, Order, Verdict } from '@zoria/protocol';
-import { allocate, busyHands } from './allocate.ts';
+import { allocate } from './allocate.ts';
 import type { Links } from './map/links.ts';
-import { cfg } from './map/valley.ts';
 import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
 import { keepalive } from './plans/keepalive.ts';
@@ -59,7 +58,6 @@ export class Brain {
     const v = this.ctx.v;
     const chosen = allocate(tasks, {
       chan: w.chan,
-      busyHands: busyHands(w.units, cfg(v, 'chanTick')),
       cap: orderCap(v.cfg as unknown as ChannelCfg, w.chanAt),
       energy: w.energy,
     });
