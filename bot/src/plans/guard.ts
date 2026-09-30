@@ -35,17 +35,18 @@ export function guard(ctx: Ctx): Task[] {
   const klinoks = w.units.filter((u) => u.cls === 'клинок' && !midStep(u) && !u.stuck);
   if (klinoks.length === 0) return [];
   const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
-  const grace = cfg(v, 'capGrace');
+  const { preset } = ctx;
+  const grace = preset.ramGrace > 0 ? cfg(v, 'capGrace') : 0;
   const heatable = new Set(w.mine.map((n) => keyOf(n)).filter((k) => !starts.has(k) && w.t - (w.since.get(k) ?? w.t) >= grace));
   const chasing = new Set(w.units.flatMap((k) => (k.cls === 'клинок' && k.task?.ram ? [k.task.ram] : [])));
   const threats = w.foe
-    .filter((f) => f.cls === 'ткач' && f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id) && heatable.has(keyOf(f)) && w.stillFoe(f.id))
+    .filter((f) => f.cls === 'ткач' && f.p !== v.slot && f.p !== 'K' && !chasing.has(f.id) && heatable.has(keyOf(f)) && w.stillFor(f.id) >= preset.ramStill)
     .sort((a, b) => a.id.localeCompare(b.id));
   const tasks: Task[] = [];
   const used = new Set<string>();
   for (const k of klinoks) {
     const id = k.task?.ram;
-    if (!id) continue;
+    if (!id || preset.chaseOff === 0) continue;
     const f = w.foe.find((x) => x.id === id);
     if (f && heatable.has(keyOf(f))) continue;
     used.add(k.id);
@@ -53,7 +54,7 @@ export function guard(ctx: Ctx): Task[] {
   }
   for (const f of threats) {
     const heat = cfg(v, w.dark.get(keyOf(f)) === true ? 'heatDark' : 'heatEnemy');
-    const inTime = (k: Cell): boolean => w.stillFor(f.id) + dist(k, f) + RAM_MARGIN < heat;
+    const inTime = (k: Cell): boolean => preset.ramTiming === 0 || w.stillFor(f.id) + dist(k, f) + RAM_MARGIN < heat;
     const free = klinoks.filter((k) => !used.has(k.id) && !k.task?.ram && inTime(k)).sort((a, b) => dist(a, f) - dist(b, f) || a.id.localeCompare(b.id));
     const k = free[0];
     if (!k) break;
