@@ -11,7 +11,7 @@ export function yard(ctx: Ctx): Task[] {
   const weight = weightOf(v, w.units) + memo.pendingYard.reduce((s, p) => s + weightOfCls(p.cls), 0);
   const tk = count('ткач');
   const kl = count('клинок');
-  const guardFirst = kl === 0 && preset.klinokTarget > 0 && tk >= Math.min(2, preset.tkachTarget);
+  const guardFirst = preset.guardFirst > 0 && kl === 0 && preset.klinokTarget > 0 && tk >= Math.min(2, preset.tkachTarget);
   const cls: ClsName | null = guardFirst ? 'клинок' : tk < preset.tkachTarget ? 'ткач' : kl < preset.klinokTarget ? 'клинок' : null;
   if (cls === null) return [];
   const cost = cfg(v, cls === 'ткач' ? 'costTkach' : 'costKlinok');

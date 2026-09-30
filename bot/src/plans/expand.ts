@@ -129,7 +129,7 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
   }
   const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
   const klinoks = w.units.filter((u) => u.cls === 'клинок').length;
-  const guardGap = Math.max(0, preset.klinokTarget - klinoks) * cfg(v, 'costKlinok');
+  const guardGap = preset.guardFirst > 0 ? Math.max(0, preset.klinokTarget - klinoks) * cfg(v, 'costKlinok') : 0;
   const need = cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0) + guardGap;
   if (w.energy >= need) {
     const seen = new Set<string>();
