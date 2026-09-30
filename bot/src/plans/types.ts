@@ -8,22 +8,24 @@ import type { Valley } from '../map/valley.ts';
 import type { World } from '../world.ts';
 
 export interface Reservation {
-  kind: 'take' | 'build' | 'feed';
+  kind: 'take' | 'build' | 'feed' | 'home';
   cell: Cell;
   since: number;
   sent: number;
   owner?: ActorName | null;
+  work?: number;
+  arrived?: number;
 }
 
 export interface Memo {
   res: Map<string, Reservation>;
   pendingYard: number[];
   lastAccepted: number;
-  banned: Set<string>;
+  banned: Map<string, number>;
 }
 
 export function newMemo(): Memo {
-  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Set() };
+  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Map() };
 }
 
 export interface Ctx {

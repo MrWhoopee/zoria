@@ -10,7 +10,15 @@ import type { Ctx, Reservation, Task } from './types.ts';
 
 export const RESERVE_TTL = 200;
 export const REISSUE_GAP = 6;
+export const AWAY_LIMIT = 20;
+export const HEAT_SLACK = 12;
+export const BAN_TICKS = 80;
+export const REFUSE_BAN = 150;
 const BANNING = new Set([11, 12, 21]);
+
+export function banned(ctx: Ctx, k: string): boolean {
+  return (ctx.memo.banned.get(k) ?? -1) > ctx.w.t;
+}
 
 interface Site {
   cell: Cell;
@@ -22,13 +30,18 @@ interface Site {
 
 export function release(ctx: Ctx): void {
   const { w, memo, v } = ctx;
-  const alive = new Set(w.units.map((u) => u.id));
+  const alive = new Map(w.units.map((u) => [u.id, u]));
   for (const [id, r] of memo.res) {
+    const unit = alive.get(id);
+    if (r.kind === 'home') {
+      if (!unit || unit.away === 0) memo.res.delete(id);
+      continue;
+    }
     const o = w.owner.get(keyOf(r.cell));
     const done = r.kind !== 'feed' && o === v.slot;
     const was = r.owner ?? null;
     const gone = r.kind === 'take' ? o !== was && o !== v.slot : r.kind === 'build' ? o !== undefined && o !== v.slot : o !== v.slot;
-    if (!alive.has(id) || done || gone || w.t - r.since > RESERVE_TTL) memo.res.delete(id);
+    if (!unit || done || gone || w.t - r.since > RESERVE_TTL) memo.res.delete(id);
   }
 }
 
@@ -75,7 +88,7 @@ export function reconnectValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull,
 export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<string>): Site[] {
   const { v, w, links, memo, preset } = ctx;
   const out: Site[] = [];
-  const free = (k: string): boolean => !reserved.has(k) && !memo.banned.has(k);
+  const free = (k: string): boolean => !reserved.has(k) && !banned(ctx, k);
   const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
   const cut = cutNeedles(ctx, anchors);
   const back = (c: Cell): number => reconnectValue(ctx, c, anchors, own, foe, cut);
@@ -113,15 +126,26 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
   return out.filter((s) => s.gain > 0);
 }
 
-function siteOrder(unit: string, s: { cell: Cell; kind: 'take' | 'build' }): Order {
-  if (s.kind === 'take') return { kind: 'move', unit, q: s.cell.q, r: s.cell.r, goal: { q: s.cell.q, r: s.cell.r }, home: false };
-  return { kind: 'needle', unit, q: s.cell.q, r: s.cell.r };
+interface Claim {
+  kind: Reservation['kind'];
+  cell: Cell;
+  owner: ActorName | null;
+  work: number;
 }
 
-function taskFor(ctx: Ctx, u: MineUnit, kind: Reservation['kind'], cell: Cell, order: Order, value: number, since: number, owner: ActorName | null = null): Task {
-  const k = keyOf(cell);
+function claimOrder(unit: string, c: Claim): Order {
+  if (c.kind === 'take') return { kind: 'move', unit, q: c.cell.q, r: c.cell.r, goal: { q: c.cell.q, r: c.cell.r }, home: false };
+  if (c.kind === 'build') return { kind: 'needle', unit, q: c.cell.q, r: c.cell.r };
+  if (c.kind === 'feed') return { kind: 'feed', unit, q: c.cell.q, r: c.cell.r };
+  return { kind: 'move', unit, q: c.cell.q, r: c.cell.r, goal: null, home: false };
+}
+
+function taskFor(ctx: Ctx, u: MineUnit, c: Claim, value: number, since: number): Task {
+  const k = keyOf(c.cell);
+  const order = claimOrder(u.id, c);
+  const until = ctx.w.t + REFUSE_BAN;
   return {
-    tag: 'expand:' + kind,
+    tag: 'expand:' + c.kind,
     unit: u.id,
     order,
     value,
@@ -129,11 +153,11 @@ function taskFor(ctx: Ctx, u: MineUnit, kind: Reservation['kind'], cell: Cell, o
     hands: u.task === null ? cfg(ctx.v, 'chanTick') : 0,
     energy: 0,
     commit: (m, t) => {
-      m.res.set(u.id, { kind, cell, since: since < 0 ? t : since, sent: t, owner });
+      m.res.set(u.id, { kind: c.kind, cell: c.cell, since: since < 0 ? t : since, sent: t, owner: c.owner, work: c.work });
     },
     refused: (m, code) => {
       m.res.delete(u.id);
-      if (BANNING.has(code)) m.banned.add(k);
+      if (BANNING.has(code)) m.banned.set(k, until);
     },
   };
 }
@@ -156,27 +180,54 @@ function feedCell(ctx: Ctx, taken: Set<string>): Cell | null {
   return best;
 }
 
+function nearestHome(anchors: Cell[], u: Cell): Cell {
+  let best = anchors[0] ?? u;
+  for (const a of anchors) if (dist(a, u) < dist(best, u)) best = a;
+  return best;
+}
+
+function overstayed(ctx: Ctx, u: MineUnit): void {
+  const { w, memo } = ctx;
+  const r = memo.res.get(u.id);
+  if (!r || r.kind !== 'take' || u.q !== r.cell.q || u.r !== r.cell.r) return;
+  if (r.arrived === undefined) {
+    r.arrived = w.t;
+    return;
+  }
+  if (w.t - r.arrived <= (r.work ?? 0) + HEAT_SLACK) return;
+  memo.res.delete(u.id);
+  memo.banned.set(keyOf(r.cell), w.t + BAN_TICKS);
+}
+
 export function expand(ctx: Ctx): Task[] {
   const { v, w, memo } = ctx;
   release(ctx);
   const lit = w.ownLit();
   const anchors = [v.base, ...lit];
-  const own = pullOf(v, lit.map((c) => ({ cell: c, mult: 1 })));
-  const foe = pullOf(v, w.foeLit());
-  const reserved = new Set([...memo.res.values()].map((r) => keyOf(r.cell)));
   const tasks: Task[] = [];
-  const ready = w.units.filter((u) => u.cls === 'ткач' && u.wait === 0).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const ready = w.units.filter((u) => u.cls === 'ткач' && u.wait === 0 && !u.stuck).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const leashed = new Set<string>();
   for (const u of ready) {
+    overstayed(ctx, u);
     const r = memo.res.get(u.id);
+    if (u.away >= AWAY_LIMIT && r?.kind !== 'home') {
+      leashed.add(u.id);
+      const home = nearestHome(lit.length > 0 ? lit : [v.base], u);
+      tasks.push(taskFor(ctx, u, { kind: 'home', cell: home, owner: null, work: 0 }, 1e5, -1));
+      continue;
+    }
     if (!r || r.kind === 'feed' || u.task !== null || w.t - r.sent < REISSUE_GAP) continue;
     if (r.kind === 'take' && u.q === r.cell.q && u.r === r.cell.r) continue;
-    tasks.push(taskFor(ctx, u, r.kind, r.cell, siteOrder(u.id, { cell: r.cell, kind: r.kind }), 1, r.since, r.owner ?? null));
+    tasks.push(taskFor(ctx, u, { kind: r.kind, cell: r.cell, owner: r.owner ?? null, work: r.work ?? 0 }, 1, r.since));
   }
   const free = ready.filter((u) => {
     const r = memo.res.get(u.id);
-    return !r || r.kind === 'feed';
+    return !leashed.has(u.id) && (!r || r.kind === 'feed');
   });
   if (free.length === 0) return tasks;
+  const own = pullOf(v, lit.map((c) => ({ cell: c, mult: 1 })));
+  const foe = pullOf(v, w.foeLit());
+  const reserved = new Set([...memo.res.values()].map((r) => keyOf(r.cell)));
   const all = sites(ctx, anchors, own, foe, reserved);
   const rate = cfg(v, 'minuteRate');
   const left = v.ticks - w.t;
@@ -199,14 +250,14 @@ export function expand(ctx: Ctx): Task[] {
     }
     if (best) {
       taken.add(keyOf(best.cell));
-      tasks.push(taskFor(ctx, u, best.kind, best.cell, siteOrder(u.id, best), bestScore, -1, best.owner));
+      tasks.push(taskFor(ctx, u, { kind: best.kind, cell: best.cell, owner: best.owner, work: best.work }, bestScore, -1));
       continue;
     }
     if (memo.res.has(u.id) || !ctx.preset.feed) continue;
     const f = feedCell(ctx, taken);
     if (!f) continue;
     taken.add(keyOf(f));
-    tasks.push(taskFor(ctx, u, 'feed', f, { kind: 'feed', unit: u.id, q: f.q, r: f.r }, 0.001, -1));
+    tasks.push(taskFor(ctx, u, { kind: 'feed', cell: f, owner: null, work: 0 }, 0.001, -1));
   }
   return tasks;
 }

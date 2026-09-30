@@ -169,3 +169,41 @@ test('retaking a captured link is worth the branch it reconnects', () => {
   const valueOf = (c: typeof ctx): number => sites(c, [c.v.base, ...c.w.ownLit()], new Map(), new Map(), new Set()).find((s) => s.cell.q === link.q && s.cell.r === link.r)?.gain ?? 0;
   assert.ok(valueOf(ctx) > valueOf(plain));
 });
+
+test('a Tkach long out of link range heads to the nearest lit needle', () => {
+  const ctx = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 0, 0, { away: 25 })] } }));
+  ctx.memo.res.set('T-B6', { kind: 'take', cell: { q: -5, r: 0 }, since: 250, sent: 250, owner: null });
+  const tasks = expand(ctx);
+  assert.equal(tasks.length, 1);
+  const o = tasks[0]?.order;
+  assert.equal(o?.kind, 'move');
+  if (o?.kind === 'move') assert.ok((o.q === 7 && o.r === 5) || (o.q === 5 && o.r === 7));
+  tasks[0]?.commit(ctx.memo, 300);
+  assert.equal(ctx.memo.res.get('T-B6')?.kind, 'home');
+});
+
+test('a frozen Tkach gets no order', () => {
+  const ctx = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 0, 0, { away: 60, stuck: true })] } }));
+  assert.equal(expand(ctx).length, 0);
+});
+
+test('standing on a target far longer than the heat takes gives it up for a while', () => {
+  const ctx = ctxOf('B', makeObs({ t: 100, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
+  const r0 = ctx.v.ruins[0];
+  assert.ok(r0);
+  const u = tkach('T-B6', r0.q, r0.r);
+  const at = (t: number): typeof ctx => {
+    const c = ctxOf('B', makeObs({ t, mine: { ...makeObs().mine, needles: starts, units: [u] } }));
+    c.memo.res = ctx.memo.res;
+    c.memo.banned = ctx.memo.banned;
+    return c;
+  };
+  ctx.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 90, sent: 90, owner: null, work: 8 });
+  expand(at(100));
+  assert.equal(ctx.memo.res.get('T-B6')?.arrived, 100);
+  expand(at(115));
+  assert.equal(ctx.memo.res.has('T-B6'), true);
+  expand(at(125));
+  assert.equal(ctx.memo.res.get('T-B6')?.cell === r0, false);
+  assert.ok((ctx.memo.banned.get(keyOf(r0)) ?? 0) > 125);
+});
