@@ -240,3 +240,30 @@ test('a Tkach with leftover wait but no task can take an order', () => {
   const ctx = ctxOf('B', makeObs({ t: 30, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6, { wait: 2 })] } }));
   assert.equal(expand(ctx).length, 1);
 });
+
+test('ticks without hands do not count toward the overstay timeout', () => {
+  const r0 = ctxOf('B', makeObs()).v.ruins[0];
+  assert.ok(r0);
+  const ctx = ctxOf('B', makeObs({ t: 125, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', r0.q, r0.r, { mute: true })] } }));
+  ctx.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 90, sent: 90, owner: null, work: 8, arrived: 100, muted: 10 });
+  expand(ctx);
+  assert.equal(ctx.memo.res.get('T-B6')?.cell, r0);
+});
+
+test('a refused stage or home order bans its cell for a while', () => {
+  const ctx = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 0, 0, { away: 33 })] } }));
+  const home = expand(ctx)[0];
+  assert.ok(home && home.tag === 'expand:home' && home.order.kind === 'move');
+  home.commit(ctx.memo, 300);
+  home.refused(ctx.memo, 12);
+  assert.ok((ctx.memo.banned.get(home.order.q + ',' + home.order.r) ?? 0) > 300);
+});
+
+test('leaving a far site on the leash bans that site for a while', () => {
+  const r0 = ctxOf('B', makeObs()).v.ruins[0];
+  assert.ok(r0);
+  const ctx = ctxOf('B', makeObs({ t: 300, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 0, 0, { away: 33 })] } }));
+  ctx.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 250, sent: 250, owner: null, work: 8 });
+  expand(ctx);
+  assert.ok((ctx.memo.banned.get(keyOf(r0)) ?? 0) > 300);
+});

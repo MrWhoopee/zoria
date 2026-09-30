@@ -33,6 +33,7 @@ interface Site {
 
 export function release(ctx: Ctx): void {
   const { w, memo, v } = ctx;
+  for (const [k, until] of memo.banned) if (until <= w.t) memo.banned.delete(k);
   const alive = new Map(w.units.map((u) => [u.id, u]));
   for (const [id, r] of memo.res) {
     const unit = alive.get(id);
@@ -224,12 +225,13 @@ function leashRisk(ctx: Ctx, u: MineUnit): boolean {
 function overstayed(ctx: Ctx, u: MineUnit): void {
   const { w, memo } = ctx;
   const r = memo.res.get(u.id);
-  if (!r || r.kind !== 'take' || u.q !== r.cell.q || u.r !== r.cell.r) return;
+  if (!r || (r.kind !== 'take' && r.kind !== 'build') || u.q !== r.cell.q || u.r !== r.cell.r) return;
   if (r.arrived === undefined) {
     r.arrived = w.t;
     return;
   }
-  if (w.t - r.arrived <= (r.work ?? 0) + HEAT_SLACK) return;
+  if (u.mute) r.muted = (r.muted ?? 0) + 1;
+  if (r.kind !== 'take' || w.t - r.arrived - (r.muted ?? 0) <= (r.work ?? 0) + HEAT_SLACK) return;
   memo.res.delete(u.id);
   memo.banned.set(keyOf(r.cell), w.t + BAN_TICKS);
 }
@@ -263,6 +265,7 @@ export function expand(ctx: Ctx): Task[] {
     const r = memo.res.get(u.id);
     if (r?.kind !== 'home' && leashRisk(ctx, u)) {
       leashed.add(u.id);
+      if (r && (r.kind === 'take' || r.kind === 'build')) memo.banned.set(keyOf(r.cell), w.t + BAN_TICKS);
       const home = nearestHome(lit.length > 0 ? lit : [v.base], u);
       tasks.push(taskFor(ctx, u, { kind: 'home', cell: home, owner: null, work: 0 }, 1e5, -1));
       continue;

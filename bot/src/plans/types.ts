@@ -15,6 +15,7 @@ export interface Reservation {
   owner?: ActorName | null;
   work?: number;
   arrived?: number;
+  muted?: number;
 }
 
 export interface Memo {
