@@ -9,6 +9,7 @@ export interface Choice {
 
 export interface DecisionRecord {
   t: number;
+  preset: string;
   offered: number;
   errors: number;
   chosen: Choice[];

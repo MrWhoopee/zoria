@@ -12,8 +12,8 @@ import { jam } from './plans/jam.ts';
 import { pact } from './plans/pact.ts';
 import { keepalive } from './plans/keepalive.ts';
 import { newMemo } from './plans/types.ts';
-import { presetOf } from './preset.ts';
-import type { Preset } from './preset.ts';
+import { presetAt, scheduleOf } from './preset.ts';
+import type { Schedule } from './preset.ts';
 import type { Advisor, Ctx, Memo, Task } from './plans/types.ts';
 import { yard } from './plans/yard.ts';
 import { World } from './world.ts';
@@ -33,13 +33,15 @@ export class Brain {
   private readonly ctx: Ctx;
   private readonly advisors: Advisor[];
   private readonly clock: () => number;
+  private readonly schedule: Schedule;
   private sent: Task[] = [];
   private sentAt = 0;
-  private record: DecisionRecord = { t: 0, offered: 0, errors: 0, chosen: [] };
+  private record: DecisionRecord = { t: 0, preset: '', offered: 0, errors: 0, chosen: [] };
 
-  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand, jam, pact], clock: () => number = () => performance.now(), preset: Preset = presetOf('основний')) {
+  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand, jam, pact], clock: () => number = () => performance.now(), schedule: Schedule = scheduleOf('основний')) {
     this.world = new World(v);
-    this.ctx = { v, w: this.world, links, memo: this.memo, preset };
+    this.schedule = schedule;
+    this.ctx = { v, w: this.world, links, memo: this.memo, preset: presetAt(schedule, 0) };
     this.advisors = advisors;
     this.clock = clock;
   }
@@ -48,6 +50,7 @@ export class Brain {
     const t0 = this.clock();
     const errorsBefore = this.stats.errors;
     this.world.update(obs);
+    this.ctx.preset = presetAt(this.schedule, this.world.t);
     const tasks: Task[] = [];
     for (const advise of this.advisors) {
       if (this.clock() - t0 > THINK_LIMIT_MS) {
@@ -74,7 +77,7 @@ export class Brain {
     for (const t of chosen) t.commit(this.memo, w.t);
     this.sent = chosen;
     this.sentAt = w.t;
-    this.record = { t: w.t, offered: tasks.length, errors: this.stats.errors - errorsBefore, chosen: chosen.map((c) => ({ tag: c.tag, unit: c.unit, value: c.value, order: c.order })) };
+    this.record = { t: w.t, preset: this.ctx.preset.name, offered: tasks.length, errors: this.stats.errors - errorsBefore, chosen: chosen.map((c) => ({ tag: c.tag, unit: c.unit, value: c.value, order: c.order })) };
     return chosen.map((t) => t.order);
   }
 

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Order, Verdict } from '@zoria/protocol';
 import { Brain } from '../src/brain.ts';
+import { scheduleOf } from '../src/preset.ts';
+import type { Ctx } from '../src/plans/types.ts';
 import type { Advisor } from '../src/plans/types.ts';
 import { ctxOf } from './ctx.ts';
 import { makeObs, tkach } from './obs.ts';
@@ -110,8 +112,35 @@ test('the brain keeps a decision record for the last tick', () => {
   b.tick(makeObs({ t: 1, mine: { ...makeObs().mine, needles: starts } }));
   const d = b.decisions();
   assert.equal(d.t, 1);
+  assert.equal(d.preset, 'основний');
   assert.deepEqual(d.chosen.map((c) => [c.tag, c.unit, c.order.kind]), [['yard', null, 'yard']]);
   assert.equal(d.chosen[0]?.value, 1e6);
   assert.equal(d.offered, 1);
   assert.deepEqual(d.errors, 0);
+});
+
+function scheduled(name: string, seen: string[]): Brain {
+  const ctx = ctxOf('B', makeObs());
+  const spy: Advisor = (c: Ctx) => {
+    seen.push(c.preset.name);
+    return [];
+  };
+  return new Brain(ctx.v, ctx.links, [spy], undefined, scheduleOf(name));
+}
+
+test('the brain switches its preset at the scheduled tick and logs it', () => {
+  const seen: string[] = [];
+  const b = scheduled('основний>широкий@2', seen);
+  for (let t = 1; t <= 3; t++) b.tick(makeObs({ t, mine: { ...makeObs().mine, needles: starts } }));
+  assert.deepEqual(seen, ['основний', 'широкий', 'широкий']);
+  assert.equal(b.decisions().preset, 'широкий');
+});
+
+test('a boundary skipped by missed frames still switches the preset', () => {
+  const seen: string[] = [];
+  const b = scheduled('основний>варта@3', seen);
+  b.tick(makeObs({ t: 1, mine: { ...makeObs().mine, needles: starts } }));
+  b.tick(makeObs({ t: 5, mine: { ...makeObs().mine, needles: starts } }));
+  assert.deepEqual(seen, ['основний', 'варта']);
+  assert.equal(b.decisions().preset, 'варта');
 });

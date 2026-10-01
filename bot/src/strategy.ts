@@ -9,8 +9,8 @@ import type { BrainStats } from './brain.ts';
 import type { DecisionRecord } from './decisions.ts';
 import { Links } from './map/links.ts';
 import { buildValley } from './map/valley.ts';
-import { PRESETS, presetOf } from './preset.ts';
-import type { Preset } from './preset.ts';
+import { PRESETS, scheduleOf } from './preset.ts';
+import type { Schedule } from './preset.ts';
 
 export interface Strategy extends WireBot {
   belief(obs: Observe | null): BeliefFrame | null;
@@ -20,17 +20,17 @@ export interface Strategy extends WireBot {
 
 class BrainStrategy implements Strategy {
   private brain: Brain | null = null;
-  private readonly preset: Preset;
+  private readonly schedule: Schedule;
 
-  constructor(preset: Preset) {
-    this.preset = preset;
+  constructor(schedule: Schedule) {
+    this.schedule = schedule;
   }
 
   init(manifest: Uint8Array, slot: SlotName): void {
     const m = decodeManifest(manifest);
     if (!m) throw new Error('manifest did not decode');
     const v = buildValley(m, slot);
-    this.brain = new Brain(v, new Links(new RulesOracle(createEngine, manifest), v), undefined, undefined, this.preset);
+    this.brain = new Brain(v, new Links(new RulesOracle(createEngine, manifest), v), undefined, undefined, this.schedule);
   }
 
   tick(observe: Uint8Array): Uint8Array {
@@ -62,5 +62,5 @@ export function presets(): string[] {
 }
 
 export function createStrategy(preset = 'основний'): Strategy {
-  return new BrainStrategy(presetOf(preset));
+  return new BrainStrategy(scheduleOf(preset));
 }

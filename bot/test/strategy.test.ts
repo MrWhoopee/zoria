@@ -35,7 +35,12 @@ test('the strategy hands out the decision record as one NDJSON line', async () =
   const s = createStrategy();
   assert.equal(s.decisions(), null);
   s.init(manifestBytes(), 'A');
-  const line = decisionLine({ t: 3, offered: 2, errors: 0, chosen: [{ tag: 'yard', unit: null, value: 1e6, order: { kind: 'yard', cls: 'ткач' } }] });
+  const line = decisionLine({ t: 3, preset: 'глушій', offered: 2, errors: 0, chosen: [{ tag: 'yard', unit: null, value: 1e6, order: { kind: 'yard', cls: 'ткач' } }] });
   assert.ok(line.endsWith('\n'));
-  assert.deepEqual(JSON.parse(line), { t: 3, offered: 2, errors: 0, chosen: [{ tag: 'yard', unit: null, value: 1e6, order: { kind: 'yard', cls: 'ткач' } }] });
+  assert.deepEqual(JSON.parse(line), { t: 3, preset: 'глушій', offered: 2, errors: 0, chosen: [{ tag: 'yard', unit: null, value: 1e6, order: { kind: 'yard', cls: 'ткач' } }] });
+});
+
+test('a strategy accepts a schedule name', () => {
+  assert.ok(createStrategy('широкий>глушій@400'));
+  assert.throws(() => createStrategy('широкий>глушій@0'));
 });
