@@ -135,6 +135,10 @@ function task(ctx: Ctx, u: MineUnit, tag: string, order: Order, value: number, r
 function drop(ctx: Ctx, u: MineUnit, r: Reservation): Task {
   ctx.memo.res.delete(u.id);
   ctx.memo.banned.set('jam:' + keyOf(r.cell), ctx.w.t + JAM_BAN);
+  return stop(ctx, u);
+}
+
+function stop(ctx: Ctx, u: MineUnit): Task {
   const home = ctx.w.ownLit()[0] ?? ctx.v.base;
   if (u.away > 0) return task(ctx, u, 'jam:home', { kind: 'move', unit: u.id, q: home.q, r: home.r, goal: null, home: true }, 2, null);
   return task(ctx, u, 'jam:stop', { kind: 'halt', unit: u.id }, 2, null);
@@ -161,10 +165,21 @@ function tend(ctx: Ctx, u: MineUnit, r: Reservation): Task | null {
   return null;
 }
 
+function callOff(ctx: Ctx, klinoks: MineUnit[]): Task[] {
+  const out: Task[] = [];
+  for (const u of klinoks) {
+    const r = ctx.memo.res.get(u.id);
+    if (r?.kind === 'jam' && u.task?.ram) ctx.memo.res.delete(u.id);
+    else if (r?.kind === 'jam') out.push(drop(ctx, u, r));
+    else if (u.task?.jam) out.push(stop(ctx, u));
+  }
+  return out;
+}
+
 export function jam(ctx: Ctx): Task[] {
   const { v, w, memo, preset } = ctx;
-  if (preset.jam <= 0) return [];
   const klinoks = w.units.filter((u) => u.cls === 'клинок' && !u.stuck && !midStep(u)).sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (preset.jam <= 0) return callOff(ctx, klinoks);
   const tasks: Task[] = [];
   const busy = new Set<string>();
   for (const u of klinoks) {

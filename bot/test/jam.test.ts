@@ -100,3 +100,26 @@ test('a jam that keeps stealing is kept', () => {
   assert.deepEqual(jam(ctx), []);
   assert.equal(ctx.memo.res.get('K-B7')?.kind, 'jam');
 });
+
+test('when the preset turns jamming off, a Klinok still jamming is called off and its reservation dropped', () => {
+  const held = { goal: null, site: null, feed: null, jam: { q: 5, r: -8 }, ram: null, home: false, path: 0 };
+  const ctx = ctxOf('B', obsWith([klinok('K-B7', 5, -7, { task: held, away: 3 }), klinok('K-B8', 5, -2)]));
+  ctx.memo.res.set('K-B7', { kind: 'jam', cell: { q: 5, r: -8 }, since: 290, sent: 290, owner: 'A' });
+  const tasks = jam(ctx);
+  assert.deepEqual(tasks.map((t) => [t.tag, t.unit, t.order.kind]), [['jam:home', 'K-B7', 'move']]);
+  assert.equal(ctx.memo.res.has('K-B7'), false);
+});
+
+test('when jamming is off, a Klinok left jamming without a reservation is still halted', () => {
+  const held = { goal: null, site: null, feed: null, jam: { q: 5, r: -8 }, ram: null, home: false, path: 0 };
+  const tasks = jam(ctxOf('B', obsWith([klinok('K-B7', 5, -7, { task: held })])));
+  assert.deepEqual(tasks.map((t) => [t.tag, t.order]), [['jam:stop', { kind: 'halt', unit: 'K-B7' }]]);
+});
+
+test('when jamming is off, a Klinok busy ramming only loses its jam reservation', () => {
+  const ramming = { goal: null, site: null, feed: null, jam: null, ram: 'T-A3', home: false, path: 0 };
+  const ctx = ctxOf('B', obsWith([klinok('K-B7', 5, -7, { task: ramming })]));
+  ctx.memo.res.set('K-B7', { kind: 'jam', cell: { q: 5, r: -8 }, since: 290, sent: 290, owner: 'A' });
+  assert.deepEqual(jam(ctx), []);
+  assert.equal(ctx.memo.res.has('K-B7'), false);
+});
