@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { jobs, trios } from '../tools/league/jobs.ts';
-import { kindOf, seatOf } from '../tools/league/roster.ts';
+import { fileSafe, kindOf, seatOf } from '../tools/league/roster.ts';
 import { headToHead, standings, worst } from '../tools/league/table.ts';
 import type { Breakdown, PackRecord } from '../tools/league/table.ts';
 
@@ -79,4 +79,10 @@ test('schedules resolve to preset seats, mixed ones are refused', () => {
   assert.throws(() => kindOf('рівний>основний@300'));
   assert.throws(() => kindOf('облягач+pirate=1>основний@300'));
   assert.throws(() => kindOf('широкий>глушій@0'));
+});
+
+test('participant names become safe file names on Windows', () => {
+  assert.equal(fileSafe('глушій>широкий@300-рівний'), 'глушій_широкий@300-рівний');
+  assert.equal(fileSafe('a<b:c"d/e\\f|g?h*i'), 'a_b_c_d_e_f_g_h_i');
+  assert.equal(fileSafe('скупий+steal=0'), 'скупий+steal=0');
 });

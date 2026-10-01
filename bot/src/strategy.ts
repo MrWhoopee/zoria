@@ -64,3 +64,8 @@ export function presets(): string[] {
 export function createStrategy(preset = 'основний'): Strategy {
   return new BrainStrategy(scheduleOf(preset));
 }
+
+export function livePreset(name: string): string {
+  if (!presets().includes(name)) throw new Error('unknown live preset ' + name);
+  return name;
+}

@@ -6,7 +6,7 @@ import type { BotRun, WireBot } from '@zoria/sdk';
 import { decodeObserve } from '@zoria/protocol';
 import { decisionLine } from './decisions.ts';
 import { withJitter } from './jitter.ts';
-import { createStrategy, presets } from './strategy.ts';
+import { createStrategy, livePreset, presets } from './strategy.ts';
 import { Refusal, statusServer } from './status.ts';
 import type { Head, HeadStats } from './status.ts';
 
@@ -24,7 +24,7 @@ const decisionsFile = env['ZARIA_DECISIONS'] || (beliefFile ? beliefFile.replace
 const statusPort = Number(env['STATUS_PORT'] ?? '') || 0;
 const freeze = env['ZARIA_FREEZE'] === '1';
 
-let preset = env['ZARIA_PRESET'] || 'глушій';
+let preset = livePreset(env['ZARIA_PRESET'] || 'глушій');
 let strategy = createStrategy(preset);
 
 let phase: 'lobby' | 'live' | 'done' = 'lobby';

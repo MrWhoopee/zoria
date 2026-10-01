@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PRESETS, SCHEDULES, presetAt, presetOf, scheduleOf } from '../src/preset.ts';
 import { expand } from '../src/plans/expand.ts';
 import { yard } from '../src/plans/yard.ts';
-import { createStrategy, presets } from '../src/strategy.ts';
+import { createStrategy, livePreset, presets } from '../src/strategy.ts';
 import { ctxOf } from './ctx.ts';
 import { makeObs, tkach } from './obs.ts';
 
@@ -105,4 +105,10 @@ test('malformed schedules are refused with their text', () => {
 
 test('presetOf of a schedule name gives its first step', () => {
   assert.equal(presetOf('широкий>варта@300').name, 'широкий');
+});
+
+test('the live bot starts only on a named preset or schedule', () => {
+  assert.equal(livePreset('глушій'), 'глушій');
+  assert.equal(livePreset('загарбник'), 'загарбник');
+  for (const bad of ['глушйі', 'широкий>глушій@400', 'глушій+jam=0', '']) assert.throws(() => livePreset(bad), new RegExp('^Error: unknown live preset ' + bad.replace(/[+>@]/g, '.') + '$'));
 });

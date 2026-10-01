@@ -46,3 +46,7 @@ export function seatOf(name: string): PackSeat {
 
 export const ARCHETYPE_NAMES = Object.keys(archetypes);
 export const NAKAZ_NAMES = Object.keys(samples);
+
+export function fileSafe(name: string): string {
+  return name.replace(/[<>:"/\\|?*]/g, '_');
+}

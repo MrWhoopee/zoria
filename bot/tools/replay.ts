@@ -4,7 +4,7 @@ import { createEngine } from '@zoria/engine';
 import { openMatch } from '@zoria/sdk';
 import type { WireBot } from '@zoria/sdk';
 import type { SlotName } from '@zoria/protocol';
-import { seatOf } from './league/roster.ts';
+import { fileSafe, seatOf } from './league/roster.ts';
 
 interface Unit {
   id: string;
@@ -106,6 +106,6 @@ const data = {
   names,
 };
 const html = readFileSync(new URL('./viewer.html', import.meta.url), 'utf8').replace('__DATA__', () => JSON.stringify(data));
-const out = values.out || 'league/replay-' + seed + '-' + k + '-' + cast.join('-') + '.html';
+const out = values.out || 'league/replay-' + seed + '-' + k + '-' + fileSafe(cast.join('-')) + '.html';
 writeFileSync(out, html);
 process.stdout.write('записано: ' + out + '\n');
