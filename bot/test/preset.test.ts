@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESETS, presetOf } from '../src/preset.ts';
+import { PRESETS, SCHEDULES, presetAt, presetOf, scheduleOf } from '../src/preset.ts';
 import { expand } from '../src/plans/expand.ts';
 import { yard } from '../src/plans/yard.ts';
 import { createStrategy, presets } from '../src/strategy.ts';
@@ -58,4 +58,36 @@ test('preset values are pinned', () => {
 test('every malformed knob is refused with its text', () => {
   for (const bad of ['steal', 'steal=', '=1', 'nosuch=1', 'steal=x']) assert.throws(() => presetOf('основний+' + bad), new RegExp('^Error: bad preset knob ' + bad.replace('=', '\=') + '$'));
   assert.equal(presetOf('основний+feed=0').feed, false);
+});
+
+test('a plain name is a one-step schedule', () => {
+  const s = scheduleOf('скупий+steal=0');
+  assert.equal(s.length, 1);
+  assert.equal(s[0]?.at, 0);
+  assert.equal(s[0]?.preset.name, 'скупий+steal=0');
+  assert.equal(scheduleOf('немає такого')[0]?.preset.name, 'основний');
+});
+
+test('schedule segments carry their own knobs and start ticks', () => {
+  const s = scheduleOf('широкий+tkachTarget=5>глушій+klinokTarget=6@400>основний@900');
+  assert.deepEqual(s.map((x) => [x.at, x.preset.name]), [[0, 'широкий+tkachTarget=5'], [400, 'глушій+klinokTarget=6'], [900, 'основний']]);
+  assert.equal(s[0]?.preset.tkachTarget, 5);
+  assert.equal(s[1]?.preset.klinokTarget, 6);
+  assert.equal(s[1]?.preset.jam, 1);
+});
+
+test('presetAt switches exactly at the start tick', () => {
+  const s = scheduleOf('основний>широкий@300>варта@700');
+  assert.deepEqual([0, 299, 300, 301, 699, 700, 5000].map((t) => presetAt(s, t).name), ['основний', 'основний', 'широкий', 'широкий', 'широкий', 'варта', 'варта']);
+});
+
+test('malformed schedules are refused with their text', () => {
+  for (const bad of ['основний@0', 'основний@5>широкий@9', 'основний>широкий', 'основний>широкий@', 'основний>широкий@0', 'основний>широкий@-1', 'основний>широкий@4.5', 'основний>широкий@x', 'основний>широкий@300>варта@300', 'основний>широкий@300>варта@200', 'основний> широкий@300', 'основний>глушйі@300', 'основний>рівний@300', 'основний>', '>широкий@3']) {
+    assert.throws(() => scheduleOf(bad), (e: unknown) => e instanceof Error && e.message === 'bad preset schedule ' + bad, bad);
+  }
+  assert.throws(() => scheduleOf('основний>широкий+nosuch=1@300'), /^Error: bad preset knob nosuch=1$/);
+});
+
+test('presetOf of a schedule name gives its first step', () => {
+  assert.equal(presetOf('широкий>варта@300').name, 'широкий');
 });

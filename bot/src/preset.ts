@@ -43,7 +43,7 @@ function isKnob(k: string): k is Knob {
   return (KNOBS as readonly string[]).includes(k);
 }
 
-export function presetOf(name: string): Preset {
+function single(name: string): Preset {
   const [head, ...knobs] = name.split('+');
   const base = PRESETS[head ?? ''] ?? BASE;
   if (knobs.length === 0) return base;
@@ -56,4 +56,44 @@ export function presetOf(name: string): Preset {
     else out[key] = num;
   }
   return out;
+}
+
+export interface Step {
+  at: number;
+  preset: Preset;
+}
+
+export type Schedule = Step[];
+
+export const SCHEDULES: Record<string, string> = {};
+
+const baseOf = (segment: string): string => segment.split('+')[0] ?? '';
+
+export function scheduleOf(name: string): Schedule {
+  const text = SCHEDULES[name] ?? name;
+  const parts = text.split('>');
+  if (parts.length === 1 && !text.includes('@')) return [{ at: 0, preset: single(text) }];
+  const out: Schedule = [];
+  for (const [i, part] of parts.entries()) {
+    const mark = part.indexOf('@');
+    const head = mark < 0 ? part : part.slice(0, mark);
+    const raw = mark < 0 ? '' : part.slice(mark + 1);
+    const at = i === 0 ? 0 : Number(raw);
+    const prev = out[i - 1]?.at ?? 0;
+    const tickOk = i === 0 ? mark < 0 : raw !== '' && Number.isInteger(at) && at > prev;
+    if (!tickOk || !(baseOf(head) in PRESETS)) throw new Error('bad preset schedule ' + name);
+    out.push({ at, preset: single(head) });
+  }
+  return out;
+}
+
+export function presetAt(s: Schedule, t: number): Preset {
+  let current = s[0];
+  for (const step of s) if (step.at <= t) current = step;
+  if (!current) throw new Error('empty preset schedule');
+  return current.preset;
+}
+
+export function presetOf(name: string): Preset {
+  return name in SCHEDULES || name.includes('>') || name.includes('@') ? presetAt(scheduleOf(name), 0) : single(name);
 }
