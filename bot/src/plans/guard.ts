@@ -42,9 +42,12 @@ export function guard(ctx: Ctx): Task[] {
   const dark = w.mine.filter((n) => n.dark);
   const heaters = w.foe.filter((f) => f.cls === 'ткач' && heatable.has(keyOf(f)) && w.stillFor(f.id) >= preset.ramStill);
   const jammers = preset.ramJammers > 0 ? w.foe.filter((f) => f.cls === 'клинок' && dark.some((n) => dist(n, f) <= 1)) : [];
-  const threats = [...heaters, ...jammers]
-    .filter((f) => f.p !== v.slot && f.p !== 'K' && f.p !== w.partner && !chasing.has(f.id))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  const lit = preset.ramIntruders > 0 ? w.ownLit() : [];
+  const range = cfg(v, 'linkRange');
+  const intruders = w.foe.filter((f) => f.cls === 'ткач' && !heatable.has(keyOf(f)) && w.stillFor(f.id) >= 1 && (w.owner.get(keyOf(f)) ?? null) !== f.p && lit.some((n) => dist(n, f) <= range));
+  const fair = (f: (typeof w.foe)[number]): boolean => f.p !== v.slot && f.p !== 'K' && f.p !== w.partner && !chasing.has(f.id);
+  const byId = (a: { id: string }, b: { id: string }): number => a.id.localeCompare(b.id);
+  const threats = [...[...heaters, ...jammers].filter(fair).sort(byId), ...intruders.filter(fair).sort(byId)];
   const tasks: Task[] = [];
   const used = new Set<string>();
   for (const k of klinoks) {

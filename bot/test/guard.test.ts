@@ -123,3 +123,25 @@ test('a foe Klinok next to a dark needle of ours is rammed as a jammer', () => {
   const calm = makeObs({ t: 200, mine: { ...makeObs().mine, needles: lit, units: [klinok('K-B7', 6, 6)] }, foe: [{ id: 'K-C4', p: 'C', cls: 'клинок', q: 10, r: 3 }] });
   assert.equal(guard(ctxOf('B', calm, 2026, jam)).filter((t) => t.order.kind === 'ram').length, 0);
 });
+
+test('with ramIntruders a foe Tkach working next to our network is rammed, one walking past or far away is not', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const units = [klinok('K-B7', 6, 6)];
+  const near = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 10, r: 1 }];
+  const far = [{ id: 'T-A4', p: 'A' as const, cls: 'ткач' as const, q: 0, r: -12 }];
+  const on = presetOf('глушій+ramIntruders=1');
+  const still = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units }, foe: near });
+  assert.deepEqual(guard(settled(still, on))[0]?.order, { kind: 'ram', unit: 'K-B7', target: 'T-A3' });
+  assert.ok(guard(settled(still, presetOf('глушій'))).every((t) => t.order.kind !== 'ram'));
+  assert.ok(guard(settled(makeObs({ t: 200, mine: { ...makeObs().mine, needles, units }, foe: far }), on)).every((t) => t.order.kind !== 'ram'));
+  const ctx = ctxOf('B', makeObs({ t: 199, mine: { ...makeObs().mine, needles, units }, foe: [{ ...near[0]!, q: 11, r: 0 }] }), 2026, on);
+  ctx.w.update(still);
+  assert.ok(guard(ctx).every((t) => t.order.kind !== 'ram'));
+});
+
+test('a foe Tkach on our needle is rammed before an intruder', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const foe = [{ id: 'T-A1', p: 'A' as const, cls: 'ткач' as const, q: 10, r: 1 }, { id: 'T-A9', p: 'A' as const, cls: 'ткач' as const, q: 9, r: 3 }];
+  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe });
+  assert.deepEqual(guard(settled(obs, presetOf('глушій+ramIntruders=1')))[0]?.order, { kind: 'ram', unit: 'K-B7', target: 'T-A9' });
+});

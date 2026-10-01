@@ -24,9 +24,10 @@ export interface Preset {
   pactGap: number;
   auction: number;
   swap: number;
+  ramIntruders: number;
 }
 
-const BASE: Preset = { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2, contract: 1, dawnPrep: 1, ramGrace: 0, ramStill: 0, ramTiming: 0, chaseOff: 0, ramJammers: 0, guardFirst: 1, jam: 0, jamHome: 1, jamLeader: 1, pact: 0, pactGap: 0.15, auction: 0, swap: 0 };
+const BASE: Preset = { name: 'основний', tkachTarget: 3, buildReserve: 0, etaPower: 1, feed: false, harm: 0.5, unlock: 0.5, steal: 1, repair: 1, klinokTarget: 2, contract: 1, dawnPrep: 1, ramGrace: 0, ramStill: 0, ramTiming: 0, chaseOff: 0, ramJammers: 0, guardFirst: 1, jam: 0, jamHome: 1, jamLeader: 1, pact: 0, pactGap: 0.15, auction: 0, swap: 0, ramIntruders: 0 };
 
 export const PRESETS: Record<string, Preset> = {
   основний: BASE,
@@ -39,7 +40,7 @@ export const PRESETS: Record<string, Preset> = {
 
 type Knob = Exclude<keyof Preset, 'name'>;
 
-const KNOBS: readonly Knob[] = ['tkachTarget', 'buildReserve', 'etaPower', 'feed', 'harm', 'unlock', 'steal', 'repair', 'klinokTarget', 'contract', 'dawnPrep', 'ramGrace', 'ramStill', 'ramTiming', 'chaseOff', 'ramJammers', 'guardFirst', 'jam', 'jamHome', 'jamLeader', 'pact', 'pactGap', 'auction', 'swap'];
+const KNOBS: readonly Knob[] = ['tkachTarget', 'buildReserve', 'etaPower', 'feed', 'harm', 'unlock', 'steal', 'repair', 'klinokTarget', 'contract', 'dawnPrep', 'ramGrace', 'ramStill', 'ramTiming', 'chaseOff', 'ramJammers', 'guardFirst', 'jam', 'jamHome', 'jamLeader', 'pact', 'pactGap', 'auction', 'swap', 'ramIntruders'];
 
 function isKnob(k: string): k is Knob {
   return (KNOBS as readonly string[]).includes(k);
