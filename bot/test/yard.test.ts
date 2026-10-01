@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { presetOf } from '../src/preset.ts';
 import { yard } from '../src/plans/yard.ts';
 import { ctxOf } from './ctx.ts';
+import type { MineUnit } from '@zoria/protocol';
 import { makeObs, tkach } from './obs.ts';
 
 test('orders a Tkach when energy allows and the swarm is short', () => {
@@ -84,4 +85,24 @@ test('with no Klinok left and two Tkachs the yard rebuilds the guard first', () 
   assert.deepEqual(yard(ctxOf('B', makeObs({ pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units: one } })))[0]?.order, { kind: 'yard', cls: 'ткач' });
   const guarded = [...two, { ...tkach('K-B3', 6, 6), cls: 'клинок' as const }];
   assert.deepEqual(yard(ctxOf('B', makeObs({ pulse: { ...makeObs().pulse, energy: 300 }, mine: { ...makeObs().mine, units: guarded } })))[0]?.order, { kind: 'yard', cls: 'ткач' });
+});
+
+function klinok(id: string): MineUnit {
+  return { ...tkach(id, 6, 6), cls: 'клинок' };
+}
+
+function swarm(energy: number, units: MineUnit[]) {
+  return makeObs({ t: 400, pulse: { ...makeObs().pulse, energy }, mine: { ...makeObs().mine, units } });
+}
+
+test('with charge near the cap the swap rule trades two Klinok slots for a third Tkach', () => {
+  const units = [tkach('T-B1', 6, 6), tkach('T-B2', 6, 7), klinok('K-B3'), klinok('K-B4')];
+  assert.deepEqual(yard(ctxOf('B', swarm(320, units), 2026, presetOf('глушій+swap=300')))[0]?.order, { kind: 'yard', cls: 'ткач' });
+  assert.deepEqual(yard(ctxOf('B', swarm(299, units), 2026, presetOf('глушій+swap=300')))[0]?.order, { kind: 'yard', cls: 'клинок' });
+  assert.deepEqual(yard(ctxOf('B', swarm(320, units), 2026, presetOf('глушій')))[0]?.order, { kind: 'yard', cls: 'клинок' });
+});
+
+test('the swap rule never builds past the swarm weight', () => {
+  const full = [tkach('T-B1', 6, 6), tkach('T-B2', 6, 7), klinok('K-B3'), klinok('K-B4'), klinok('K-B5'), klinok('K-B6')];
+  assert.deepEqual(yard(ctxOf('B', swarm(360, full), 2026, presetOf('глушій+swap=300'))), []);
 });

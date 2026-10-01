@@ -11,8 +11,11 @@ export function yard(ctx: Ctx): Task[] {
   const weight = weightOf(v, w.units) + memo.pendingYard.reduce((s, p) => s + weightOfCls(p.cls), 0);
   const tk = count('ткач');
   const kl = count('клинок');
-  const guardFirst = preset.guardFirst > 0 && kl === 0 && preset.klinokTarget > 0 && tk >= Math.min(2, preset.tkachTarget);
-  const cls: ClsName | null = guardFirst ? 'клинок' : tk < preset.tkachTarget ? 'ткач' : kl < preset.klinokTarget ? 'клинок' : null;
+  const swapped = preset.swap > 0 && w.energy >= preset.swap;
+  const tkTarget = swapped ? preset.tkachTarget + 1 : preset.tkachTarget;
+  const klTarget = swapped ? Math.max(0, preset.klinokTarget - 2) : preset.klinokTarget;
+  const guardFirst = preset.guardFirst > 0 && kl === 0 && klTarget > 0 && tk >= Math.min(2, tkTarget);
+  const cls: ClsName | null = guardFirst ? 'клинок' : tk < tkTarget ? 'ткач' : kl < klTarget ? 'клинок' : null;
   if (cls === null) return [];
   const cost = cfg(v, cls === 'ткач' ? 'costTkach' : 'costKlinok');
   if (weight + weightOfCls(cls) > cfg(v, 'squadWeight') || w.energy < cost) return [];
