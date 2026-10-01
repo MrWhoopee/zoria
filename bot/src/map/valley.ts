@@ -23,6 +23,7 @@ export interface Valley {
   cfg: Record<string, number>;
   storms: StormSpec[];
   dead: Set<string>;
+  lots: { at: number; cells: Cell[] }[];
 }
 
 export function cfg(v: Valley, name: string): number {
@@ -99,5 +100,6 @@ export function buildValley(m: Manifest, slot: SlotName): Valley {
     cfg: m.cfg,
     storms: m.storms,
     dead: new Set(m.finds.filter((f) => f.kind === 'dead').map((f) => key(f.q, f.r))),
+    lots: m.lots.map((l) => ({ at: l.at, cells: l.cells.map((c) => ({ q: c.q, r: c.r })) })),
   };
 }

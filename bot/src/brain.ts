@@ -8,6 +8,7 @@ import { cfg } from './map/valley.ts';
 import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
 import { guard } from './plans/guard.ts';
+import { auction } from './plans/auction.ts';
 import { jam } from './plans/jam.ts';
 import { pact } from './plans/pact.ts';
 import { keepalive } from './plans/keepalive.ts';
@@ -38,7 +39,7 @@ export class Brain {
   private sentAt = 0;
   private record: DecisionRecord = { t: 0, preset: '', offered: 0, errors: 0, chosen: [] };
 
-  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand, jam, pact], clock: () => number = () => performance.now(), schedule: Schedule = scheduleOf('основний')) {
+  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand, jam, pact, auction], clock: () => number = () => performance.now(), schedule: Schedule = scheduleOf('основний')) {
     this.world = new World(v);
     this.schedule = schedule;
     this.ctx = { v, w: this.world, links, memo: this.memo, preset: presetAt(schedule, 0) };

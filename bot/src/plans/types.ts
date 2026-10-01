@@ -25,10 +25,11 @@ export interface Memo {
   pendingYard: { cls: ClsName; eta: number }[];
   lastAccepted: number;
   banned: Map<string, number>;
+  bids: Map<number, number>;
 }
 
 export function newMemo(): Memo {
-  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Map() };
+  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Map(), bids: new Map() };
 }
 
 export interface Ctx {
