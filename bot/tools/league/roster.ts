@@ -1,7 +1,7 @@
 import { ARCHETYPES } from '@zoria/sdk';
 import type { PackSeat } from '@zoria/sdk';
 import { NAKAZ_SAMPLES, createNakazSparring } from '@zoria/sdk/nakaz';
-import { PRESETS, presetOf } from '../../src/preset.ts';
+import { PRESETS, SCHEDULES, scheduleOf } from '../../src/preset.ts';
 import { createStrategy } from '../../src/strategy.ts';
 
 export type SeatKind = 'preset' | 'archetype' | 'mutant' | 'nakaz';
@@ -9,15 +9,17 @@ export type SeatKind = 'preset' | 'archetype' | 'mutant' | 'nakaz';
 const archetypes = ARCHETYPES as Record<string, Record<string, unknown>>;
 const samples = NAKAZ_SAMPLES as Record<string, string>;
 
+const stepBase = (step: string): string => (step.split('@')[0] ?? '').split('+')[0] ?? '';
+
 export function kindOf(name: string): SeatKind {
-  if (name in PRESETS || (name.includes('+') && (name.split('+')[0] ?? '') in PRESETS)) {
-    presetOf(name);
+  if (name in SCHEDULES || name.split('>').every((step) => stepBase(step) in PRESETS)) {
+    scheduleOf(name);
     return 'preset';
   }
   if (name in archetypes) return 'archetype';
   if (name in samples) return 'nakaz';
   const base = name.split('+')[0] ?? '';
-  if (name.includes('+') && base in archetypes) return 'mutant';
+  if (name.includes('+') && !name.includes('>') && base in archetypes) return 'mutant';
   throw new Error('unknown participant ' + name);
 }
 

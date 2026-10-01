@@ -65,7 +65,13 @@ export interface Step {
 
 export type Schedule = Step[];
 
-export const SCHEDULES: Record<string, string> = {};
+export const SCHEDULES: Record<string, string> = {
+  загарбник: 'широкий+tkachTarget=5>глушій+klinokTarget=6@400',
+  'пізній-глушій': 'скупий>глушій@600',
+  'ранній-глушій': 'глушій+jamLeader=6>широкий@500',
+  рейдер: 'варта>глушій+jamLeader=6@800',
+  маятник: 'основний>глушій@300>широкий@700',
+};
 
 const baseOf = (segment: string): string => segment.split('+')[0] ?? '';
 

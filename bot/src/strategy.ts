@@ -9,7 +9,7 @@ import type { BrainStats } from './brain.ts';
 import type { DecisionRecord } from './decisions.ts';
 import { Links } from './map/links.ts';
 import { buildValley } from './map/valley.ts';
-import { PRESETS, scheduleOf } from './preset.ts';
+import { PRESETS, SCHEDULES, scheduleOf } from './preset.ts';
 import type { Schedule } from './preset.ts';
 
 export interface Strategy extends WireBot {
@@ -58,7 +58,7 @@ class BrainStrategy implements Strategy {
 }
 
 export function presets(): string[] {
-  return Object.keys(PRESETS);
+  return [...Object.keys(PRESETS), ...Object.keys(SCHEDULES)];
 }
 
 export function createStrategy(preset = 'основний'): Strategy {

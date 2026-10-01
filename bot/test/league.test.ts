@@ -70,3 +70,13 @@ test('pending skips packs already played', async () => {
   const left = pending(all, [{ seed: 1, cast: ['a', 'b', 'p'] }, { seed: 2, cast: ['a', 'c', 'p'] }]);
   assert.deepEqual(left.map((j) => j.seed + j.cast.join('')), ['2abp', '1acp']);
 });
+
+test('schedules resolve to preset seats, mixed ones are refused', () => {
+  assert.equal(kindOf('загарбник'), 'preset');
+  assert.equal(kindOf('широкий>глушій+klinokTarget=6@400'), 'preset');
+  assert.equal(typeof seatOf('маятник').bot, 'function');
+  assert.throws(() => kindOf('основний>рівний@300'));
+  assert.throws(() => kindOf('рівний>основний@300'));
+  assert.throws(() => kindOf('облягач+pirate=1>основний@300'));
+  assert.throws(() => kindOf('широкий>глушій@0'));
+});

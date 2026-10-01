@@ -29,10 +29,25 @@ test('a preset without feeding never feeds', () => {
   assert.equal(expand(ctxOf('B', obs)).length, 0);
 });
 
-test('strategy lists every preset', () => {
-  assert.deepEqual(presets(), Object.keys(PRESETS));
+test('strategy lists every preset and named schedule, never a raw schedule', () => {
+  assert.deepEqual(presets(), [...Object.keys(PRESETS), ...Object.keys(SCHEDULES)]);
   assert.ok(presets().includes('основний'));
+  assert.ok(presets().includes('загарбник'));
+  assert.ok(!presets().includes('широкий>глушій@400'));
   assert.ok(createStrategy('скупий'));
+  assert.ok(createStrategy('загарбник'));
+});
+
+test('adaptive red schedules are pinned and parse', () => {
+  assert.deepEqual(SCHEDULES, {
+    загарбник: 'широкий+tkachTarget=5>глушій+klinokTarget=6@400',
+    'пізній-глушій': 'скупий>глушій@600',
+    'ранній-глушій': 'глушій+jamLeader=6>широкий@500',
+    рейдер: 'варта>глушій+jamLeader=6@800',
+    маятник: 'основний>глушій@300>широкий@700',
+  });
+  for (const name of Object.keys(SCHEDULES)) assert.ok(scheduleOf(name).length >= 2, name);
+  assert.deepEqual(scheduleOf('маятник').map((s) => [s.at, s.preset.name]), [[0, 'основний'], [300, 'глушій'], [700, 'широкий']]);
 });
 
 test('preset names accept knob overrides', () => {
