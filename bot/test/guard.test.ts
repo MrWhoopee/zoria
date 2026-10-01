@@ -145,3 +145,19 @@ test('a foe Tkach on our needle is rammed before an intruder', () => {
   const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe });
   assert.deepEqual(guard(settled(obs, presetOf('глушій+ramIntruders=1')))[0]?.order, { kind: 'ram', unit: 'K-B7', target: 'T-A9' });
 });
+
+test('with dawnEscort after dawn a foe Tkach heating a ring needle is rammed and idle Klinoks post at the ring', () => {
+  const v = ctxOf('B', makeObs()).v;
+  const ring = [...v.ring].sort((a, b) => Math.max(Math.abs(a.q - 6), Math.abs(a.r - 6)) - Math.max(Math.abs(b.q - 6), Math.abs(b.r - 6)))[0]!;
+  const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: ring.q, r: ring.r }];
+  const units = [klinok('K-B7', 6, 6)];
+  const on = presetOf('глушій+dawnEscort=1');
+  const after = makeObs({ t: 1010, mine: { ...makeObs().mine, needles: starts, units }, foe });
+  assert.deepEqual(guard(settled(after, on))[0]?.order, { kind: 'ram', unit: 'K-B7', target: 'T-A3' });
+  assert.ok(guard(settled(after, presetOf('глушій'))).every((t) => t.order.kind !== 'ram'));
+  assert.ok(guard(settled({ ...after, t: 990 }, on)).every((t) => t.order.kind !== 'ram'));
+  const idle = makeObs({ t: 1010, mine: { ...makeObs().mine, needles: starts, units } });
+  const o = guard(settled(idle, on))[0]?.order;
+  assert.equal(o?.kind, 'move');
+  if (o?.kind === 'move') assert.ok(v.ring.some((c) => Math.max(Math.abs(c.q - o.q), Math.abs(c.r - o.r), Math.abs(c.q + c.r - o.q - o.r)) <= 1));
+});

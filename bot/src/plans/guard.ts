@@ -26,6 +26,11 @@ function postCell(ctx: Ctx): Cell | null {
   return best;
 }
 
+function ringPost(ctx: Ctx): Cell | null {
+  const { base } = ctx.v;
+  return [...ctx.v.ring].sort((a, b) => dist(a, base) - dist(b, base) || keyOf(a).localeCompare(keyOf(b)))[0] ?? null;
+}
+
 function task(ctx: Ctx, u: MineUnit, tag: string, order: Task['order'], value: number): Task {
   return { tag, unit: u.id, order, value, bytes: bytesFor(ctx, order.kind, u), energy: 0, commit: none, refused: none };
 }
@@ -45,9 +50,11 @@ export function guard(ctx: Ctx): Task[] {
   const lit = preset.ramIntruders > 0 ? w.ownLit() : [];
   const range = cfg(v, 'linkRange');
   const intruders = w.foe.filter((f) => f.cls === 'ткач' && !heatable.has(keyOf(f)) && w.stillFor(f.id) >= 1 && (w.owner.get(keyOf(f)) ?? null) !== f.p && lit.some((n) => dist(n, f) <= range));
+  const escort = preset.dawnEscort > 0 && w.t >= v.dawnAt;
+  const ringers = escort ? w.foe.filter((f) => f.cls === 'ткач' && v.ringKeys.has(keyOf(f)) && w.stillFor(f.id) >= 1 && (w.owner.get(keyOf(f)) ?? null) !== f.p) : [];
   const fair = (f: (typeof w.foe)[number]): boolean => f.p !== v.slot && f.p !== 'K' && f.p !== w.partner && !chasing.has(f.id);
   const byId = (a: { id: string }, b: { id: string }): number => a.id.localeCompare(b.id);
-  const threats = [...[...heaters, ...jammers].filter(fair).sort(byId), ...intruders.filter(fair).sort(byId)];
+  const threats = [...[...heaters, ...jammers].filter(fair).sort(byId), ...ringers.filter(fair).sort(byId), ...intruders.filter(fair).sort(byId)];
   const tasks: Task[] = [];
   const used = new Set<string>();
   for (const k of klinoks) {
@@ -67,7 +74,7 @@ export function guard(ctx: Ctx): Task[] {
     used.add(k.id);
     tasks.push(task(ctx, k, 'guard:ram', { kind: 'ram', unit: k.id, target: f.id }, GUARD_VALUE - dist(k, f)));
   }
-  const post = postCell(ctx);
+  const post = escort ? ringPost(ctx) : postCell(ctx);
   if (!post) return tasks;
   for (const k of klinoks) {
     if (used.has(k.id) || k.task !== null || dist(k, post) <= POST_SLACK) continue;
