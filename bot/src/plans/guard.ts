@@ -8,6 +8,8 @@ import type { Ctx, Task } from './types.ts';
 export const GUARD_VALUE = 5e4;
 export const POST_SLACK = 2;
 export const RAM_MARGIN = 2;
+export const SHADOW_REACH = 10;
+export const SHADOW_VALUE = 1e3;
 
 const none = (): void => undefined;
 
@@ -73,6 +75,21 @@ export function guard(ctx: Ctx): Task[] {
     if (!k) break;
     used.add(k.id);
     tasks.push(task(ctx, k, 'guard:ram', { kind: 'ram', unit: k.id, target: f.id }, GUARD_VALUE - dist(k, f)));
+  }
+  if (preset.shadow > 0) {
+    const zone = w.ownLit();
+    const marks = w.foe
+      .filter((f) => f.cls === 'ткач' && fair(f) && !heatable.has(keyOf(f)) && zone.some((n) => dist(n, f) <= range))
+      .sort(byId)
+      .slice(0, preset.shadow);
+    for (const f of marks) {
+      const k = klinoks
+        .filter((x) => !used.has(x.id) && !x.task?.ram && !x.task?.jam && ctx.memo.res.get(x.id)?.kind !== 'jam' && dist(x, f) <= SHADOW_REACH)
+        .sort((a, b) => dist(a, f) - dist(b, f) || a.id.localeCompare(b.id))[0];
+      if (!k) continue;
+      used.add(k.id);
+      if (dist(k, f) > 1) tasks.push(task(ctx, k, 'guard:shadow', { kind: 'move', unit: k.id, q: f.q, r: f.r, goal: null, home: false }, SHADOW_VALUE - dist(k, f)));
+    }
   }
   const post = escort ? ringPost(ctx) : postCell(ctx);
   if (!post) return tasks;

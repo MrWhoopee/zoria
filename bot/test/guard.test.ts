@@ -161,3 +161,24 @@ test('with dawnEscort after dawn a foe Tkach heating a ring needle is rammed and
   assert.equal(o?.kind, 'move');
   if (o?.kind === 'move') assert.ok(v.ring.some((c) => Math.max(Math.abs(c.q - o.q), Math.abs(c.r - o.r), Math.abs(c.q + c.r - o.q - o.r)) <= 1));
 });
+
+test('with shadow a free Klinok walks up to a foe Tkach inside our zone and then stays by it', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 10, r: 1 }];
+  const on = presetOf('глушій+shadow=1');
+  const far = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 6, 6)] }, foe });
+  assert.deepEqual(guard(settled(far, on)).map((t) => [t.tag, t.order]), [['guard:shadow', { kind: 'move', unit: 'K-B7', q: 10, r: 1, goal: null, home: false }]]);
+  assert.ok(guard(settled(far, presetOf('глушій'))).every((t) => t.tag !== 'guard:shadow'));
+  const close = makeObs({ t: 200, mine: { ...makeObs().mine, needles, units: [klinok('K-B7', 10, 2)] }, foe });
+  assert.deepEqual(guard(settled(close, on)), []);
+});
+
+test('shadowing never takes a jamming Klinok and is capped by the knob', () => {
+  const needles = [...starts, { q: 9, r: 3, dark: false, fed: false, weight: 1 }];
+  const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 10, r: 1 }, { id: 'T-A4', p: 'A' as const, cls: 'ткач' as const, q: 8, r: 6 }];
+  const jamming = { goal: null, site: null, feed: null, jam: { q: 5, r: -8 }, ram: null, home: false, path: 0 };
+  const units = [klinok('K-B7', 6, 6, { task: jamming }), klinok('K-B8', 7, 6), klinok('K-B9', 6, 7)];
+  const tasks = guard(settled(makeObs({ t: 200, mine: { ...makeObs().mine, needles, units }, foe }), presetOf('глушій+shadow=1'))).filter((t) => t.tag === 'guard:shadow');
+  assert.equal(tasks.length, 1);
+  assert.notEqual(tasks[0]?.unit, 'K-B7');
+});
