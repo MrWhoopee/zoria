@@ -137,6 +137,10 @@ function goalTasks(ctx: Ctx): Task[] {
     const where = keyOf(x.cell ?? v.base);
     const owner = x.cell ? w.owner.get(keyOf(x.cell)) ?? null : null;
     const foeOwned = owner !== null && owner !== v.slot && owner !== 'K';
+    if (x.kind === 'jam' && x.cell && v.starts.some((s) => s.cell.q === x.cell?.q && s.cell.r === x.cell.r)) {
+      note(g, 't' + w.t + ': голка ' + where + ' під щитом, глушити не можна');
+      continue;
+    }
     if (x.kind === 'jam' && !foeOwned) {
       note(g, 't' + w.t + ': глушити ' + where + ' - готово або неможливо');
       continue;

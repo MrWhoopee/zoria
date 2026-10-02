@@ -44,3 +44,13 @@ test('a general command reaches the brain on the next tick', () => {
   assert.ok(next?.units.find((x) => x.id === u.id)?.manual);
   assert.ok(next?.decisions.some((d) => d.tag === 'general:order'));
 });
+
+test('the map lists the start needles and a moving unit reads as moving', async () => {
+  const { taskOf } = await import('../arena/frame.ts');
+  const s = new Session({ seed: 100, slot: 'A', rivals: ['рівний', 'рівний'], preset: 'глушій' });
+  assert.equal(s.map.starts.length, 6);
+  const base = { goal: null, site: null, feed: null, jam: null, ram: null, home: false, path: 0 };
+  assert.equal(taskOf({ task: { ...base, path: 3 } }), 'move');
+  assert.equal(taskOf({ task: { ...base, path: 0 } }), 'work');
+  assert.equal(taskOf({ task: null }), 'idle');
+});

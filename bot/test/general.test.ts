@@ -146,3 +146,14 @@ test('manual units and units on other goals are never picked for a goal', () => 
   applyCommand(ctx.memo.general, { kind: 'goal', goal: 'jam', cell: { q: 5, r: -8 } }, 60);
   assert.equal(general(ctx)[0]?.unit, 'K-B8');
 });
+
+test('a jam goal on a shielded start needle is dropped with a note', () => {
+  const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6)] }, own: [{ q: 7, r: -13, owner: 'A' as const, dark: false }] }));
+  const start = ctx.v.starts.find((s) => s.slot === 'A')?.cell;
+  assert.ok(start);
+  ctx.w.update(makeObs({ t: 61, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6)] }, own: [{ q: start.q, r: start.r, owner: 'A' as const, dark: false }] }));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'jam', cell: start }, 61);
+  assert.deepEqual(general(ctx), []);
+  assert.equal(ctx.memo.general.goals.length, 0);
+  assert.match(ctx.memo.general.notes.at(-1) ?? '', /щит/);
+});

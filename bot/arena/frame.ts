@@ -9,6 +9,7 @@ export interface ArenaMap {
   cells: [number, number, string, number][];
   seats: Record<SlotName, Cell>;
   ring: Cell[];
+  starts: Cell[];
 }
 
 export interface ArenaUnit {
@@ -54,14 +55,14 @@ export interface RevealFrame {
 
 const SLOTS: SlotName[] = ['A', 'B', 'C'];
 
-function taskOf(u: World['units'][number]): string {
+export function taskOf(u: Pick<World['units'][number], 'task'>): string {
   const t = u.task;
   if (!t) return 'idle';
   if (t.jam) return 'jam';
   if (t.ram) return 'ram';
   if (t.site) return 'build';
   if (t.home) return 'home';
-  if (t.goal) return 'move';
+  if (t.goal || t.path > 0) return 'move';
   return 'work';
 }
 

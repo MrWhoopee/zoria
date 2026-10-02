@@ -1,5 +1,4 @@
-import type { SlotName } from '@zoria/protocol';
-import type { ArenaFrame, ArenaUnit } from '../../bot/arena/frame.ts';
+import type { ArenaFrame, ArenaMap, ArenaUnit } from '../../bot/arena/frame.ts';
 import type { GeneralCommand } from '../../bot/src/general.ts';
 
 export interface MenuItem {
@@ -9,9 +8,11 @@ export interface MenuItem {
 
 type Hex = { q: number; r: number };
 
-export function menuItems(frame: ArenaFrame, slot: SlotName, seats: Record<SlotName, Hex>, cell: Hex, unit: ArenaUnit | null): MenuItem[] {
+export function menuItems(frame: ArenaFrame, map: ArenaMap, cell: Hex, unit: ArenaUnit | null): MenuItem[] {
+  const slot = map.slot;
   const owner = frame.own[cell.q + ',' + cell.r];
-  const foeNeedle = owner !== undefined && owner !== null && owner !== slot && owner !== 'K';
+  const shielded = map.starts.some((s) => s.q === cell.q && s.r === cell.r);
+  const foeNeedle = owner !== undefined && owner !== null && owner !== slot && owner !== 'K' && !shielded;
   const empty = owner === undefined;
   const foe = frame.foe.find((f) => f[3] === cell.q && f[4] === cell.r);
   if (!unit) {
@@ -22,7 +23,7 @@ export function menuItems(frame: ArenaFrame, slot: SlotName, seats: Record<SlotN
     return out;
   }
   const id = unit.id;
-  const home = seats[slot];
+  const home = map.seats[slot];
   const out: MenuItem[] = [unit.manual ? { label: 'Відпустити', command: { kind: 'release', unit: id } } : { label: 'Перехопити', command: { kind: 'take', unit: id } }];
   out.push({ label: 'Рух', command: { kind: 'order', order: { kind: 'move', unit: id, q: cell.q, r: cell.r, goal: null, home: false } } });
   if (unit.cls === 'ткач' && empty) out.push({ label: 'Будувати', command: { kind: 'order', order: { kind: 'needle', unit: id, q: cell.q, r: cell.r } } });

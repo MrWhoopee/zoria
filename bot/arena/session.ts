@@ -52,6 +52,7 @@ export class Session {
       cells: v.cells.map((c) => [c.q, c.r, v.types[v.terrain.get(keyOf(c)) ?? 0]?.name ?? 'bare', v.level.get(keyOf(c)) ?? 0]),
       seats: { A: v.seats.A, B: v.seats.B, C: v.seats.C },
       ring: v.ring,
+      starts: v.starts.map((s) => s.cell),
     };
   }
 

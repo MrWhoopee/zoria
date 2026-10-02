@@ -32,7 +32,7 @@ export function App() {
   const open = (p: MapPick): void => {
     if (!map || !frame || frame.done) return;
     const unit = frame.units.find((x) => x.id === selected) ?? null;
-    const items = menuItems(frame, map.slot, map.seats, { q: p.q, r: p.r }, unit);
+    const items = menuItems(frame, map, { q: p.q, r: p.r }, unit);
     setMenu({ x: p.x, y: p.y, title: (unit ? unit.id + ' → ' : 'Наказ боту, ') + p.q + ',' + p.r, items });
   };
 
