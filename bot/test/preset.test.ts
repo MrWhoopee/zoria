@@ -40,7 +40,7 @@ test('strategy lists every preset and named schedule, never a raw schedule', () 
 
 test('adaptive red schedules are pinned and parse', () => {
   assert.deepEqual(SCHEDULES, {
-    загарбник: 'широкий+tkachTarget=5>глушій+klinokTarget=6@400',
+    загарбник: 'широкий>глушій@400',
     'пізній-глушій': 'скупий>глушій@600',
     'ранній-глушій': 'глушій+jamLeader=6>широкий@500',
     рейдер: 'варта>глушій+jamLeader=6@800',
