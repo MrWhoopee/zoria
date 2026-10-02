@@ -144,3 +144,22 @@ test('a boundary skipped by missed frames still switches the preset', () => {
   assert.deepEqual(seen, ['основний', 'варта']);
   assert.equal(b.decisions().preset, 'варта');
 });
+
+test('the brain drops other advisors tasks for units under the general', () => {
+  const ctx = ctxOf('B', makeObs());
+  const busy: Advisor = () => [{ tag: 'busy', unit: 'T-B6', order: { kind: 'halt', unit: 'T-B6' }, value: 5, bytes: 32, energy: 0, commit: () => undefined, refused: () => undefined }];
+  const b = new Brain(ctx.v, ctx.links, [busy]);
+  b.memo.general.manual.add('T-B6');
+  b.tick(makeObs({ t: 2, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
+  assert.equal(b.decisions().chosen.filter((c) => c.tag === 'busy').length, 0);
+});
+
+test('with no general commands the default brain output is unchanged over sixty ticks', () => {
+  const ctx = ctxOf('B', makeObs());
+  const a = new Brain(ctx.v, ctx.links);
+  const b = new Brain(ctx.v, ctx.links);
+  for (let t = 1; t <= 60; t++) {
+    const obs = makeObs({ t, pulse: { ...makeObs().pulse, energy: 200 }, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } });
+    assert.deepEqual(a.tick(obs), b.tick(obs));
+  }
+});

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCommand, newGeneral, note, reserved } from '../src/general.ts';
+import { GENERAL_VALUE, applyCommand, general, newGeneral, note, reserved } from '../src/general.ts';
 import { newMemo } from '../src/plans/types.ts';
+import { ctxOf } from './ctx.ts';
+import { makeObs, tkach } from './obs.ts';
 
 test('take and release move a unit in and out of manual control', () => {
   const g = newGeneral();
@@ -62,4 +64,33 @@ test('yard sets and clears the next class, notes keep the last twenty', () => {
 test('a new memo carries an empty general', () => {
   const g = newMemo().general;
   assert.deepEqual([g.manual.size, g.queue.size, g.goals.length, g.yardNext, g.notes.length], [0, 0, 0, null, 0]);
+});
+
+const starts = [{ q: 7, r: 5, dark: false, fed: false, weight: 1 }, { q: 5, r: 7, dark: false, fed: false, weight: 1 }];
+const withUnits = (units: ReturnType<typeof tkach>[], t = 50) => makeObs({ t, mine: { ...makeObs().mine, needles: starts, units } });
+
+test('a queued manual order goes out once with the top value and is cleared on commit', () => {
+  const ctx = ctxOf('B', withUnits([tkach('T-B1', 6, 6)]));
+  applyCommand(ctx.memo.general, { kind: 'order', order: { kind: 'move', unit: 'T-B1', q: 4, r: 4, goal: null, home: false } }, 50);
+  const tasks = general(ctx);
+  assert.deepEqual(tasks.map((x) => [x.tag, x.unit, x.order.kind, x.value]), [['general:order', 'T-B1', 'move', GENERAL_VALUE]]);
+  tasks[0]?.commit(ctx.memo, 50);
+  assert.deepEqual(general(ctx), []);
+  assert.ok(ctx.memo.general.manual.has('T-B1'));
+});
+
+test('a refused manual order is dropped with a note', () => {
+  const ctx = ctxOf('B', withUnits([tkach('T-B1', 6, 6)]));
+  applyCommand(ctx.memo.general, { kind: 'order', order: { kind: 'needle', unit: 'T-B1', q: 0, r: 0 } }, 50);
+  general(ctx)[0]?.refused(ctx.memo, 11);
+  assert.equal(ctx.memo.general.queue.size, 0);
+  assert.match(ctx.memo.general.notes.at(-1) ?? '', /needle/);
+});
+
+test('orders for a unit that is gone are dropped with a note and the unit released', () => {
+  const ctx = ctxOf('B', withUnits([]));
+  applyCommand(ctx.memo.general, { kind: 'order', order: { kind: 'halt', unit: 'K-B9' } }, 50);
+  assert.deepEqual(general(ctx), []);
+  assert.equal(ctx.memo.general.manual.size, 0);
+  assert.equal(ctx.memo.general.notes.length, 1);
 });

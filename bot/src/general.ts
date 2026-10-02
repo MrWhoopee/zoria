@@ -1,5 +1,7 @@
 import type { ClsName, Order } from '@zoria/protocol';
 import type { Cell } from './hex.ts';
+import { bytesFor } from './plans/types.ts';
+import type { Ctx, Task } from './plans/types.ts';
 
 export type GoalKind = 'jam' | 'ram' | 'build';
 
@@ -73,4 +75,43 @@ export function reserved(g: General): Set<string> {
   const out = new Set(g.manual);
   for (const x of g.goals) if (x.unit) out.add(x.unit);
   return out;
+}
+
+export const GENERAL_VALUE = 1e7;
+
+function manualTasks(ctx: Ctx): Task[] {
+  const g = ctx.memo.general;
+  const alive = new Map(ctx.w.units.map((u) => [u.id, u]));
+  const out: Task[] = [];
+  for (const id of [...g.manual]) {
+    if (!alive.has(id)) {
+      g.manual.delete(id);
+      g.queue.delete(id);
+      note(g, 't' + ctx.w.t + ': ' + id + ' більше немає');
+    }
+  }
+  for (const [id, order] of g.queue) {
+    const u = alive.get(id);
+    if (!u) continue;
+    out.push({
+      tag: 'general:order',
+      unit: id,
+      order,
+      value: GENERAL_VALUE,
+      bytes: bytesFor(ctx, order.kind, u),
+      energy: 0,
+      commit: (m) => {
+        if (m.general.queue.get(id) === order) m.general.queue.delete(id);
+      },
+      refused: (m, code) => {
+        m.general.queue.delete(id);
+        note(m.general, 't' + ctx.w.t + ': ' + id + ' ' + order.kind + ' відмова ' + code);
+      },
+    });
+  }
+  return out;
+}
+
+export function general(ctx: Ctx): Task[] {
+  return manualTasks(ctx);
 }

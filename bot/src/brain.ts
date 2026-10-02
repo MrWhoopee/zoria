@@ -8,6 +8,7 @@ import type { Valley } from './map/valley.ts';
 import { expand } from './plans/expand.ts';
 import { guard } from './plans/guard.ts';
 import { auction } from './plans/auction.ts';
+import { general, reserved } from './general.ts';
 import { jam } from './plans/jam.ts';
 import { pact } from './plans/pact.ts';
 import { keepalive } from './plans/keepalive.ts';
@@ -38,7 +39,7 @@ export class Brain {
   private sentAt = 0;
   private record: DecisionRecord = { t: 0, preset: '', offered: 0, errors: 0, chosen: [] };
 
-  constructor(v: Valley, links: Links, advisors: Advisor[] = [yard, guard, expand, jam, pact, auction], clock: () => number = () => performance.now(), schedule: Schedule = scheduleOf('основний')) {
+  constructor(v: Valley, links: Links, advisors: Advisor[] = [general, yard, guard, expand, jam, pact, auction], clock: () => number = () => performance.now(), schedule: Schedule = scheduleOf('основний')) {
     this.world = new World(v);
     this.schedule = schedule;
     this.ctx = { v, w: this.world, links, memo: this.memo, preset: presetAt(schedule, 0) };
@@ -66,7 +67,9 @@ export class Brain {
     }
     const w = this.world;
     const v = this.ctx.v;
-    const chosen = allocate(tasks, {
+    const hold = reserved(this.memo.general);
+    const open = tasks.filter((t) => t.tag.startsWith('general:') || t.unit === null || !hold.has(t.unit));
+    const chosen = allocate(open, {
       chan: w.chan,
       cap: orderCap(v.cfg as unknown as ChannelCfg, w.chanAt),
       energy: w.energy,
