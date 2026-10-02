@@ -7,6 +7,8 @@ import { beliefFrame } from './belief.ts';
 import { Brain } from './brain.ts';
 import type { BrainStats } from './brain.ts';
 import type { DecisionRecord } from './decisions.ts';
+import type { General } from './general.ts';
+import type { World } from './world.ts';
 import { Links } from './map/links.ts';
 import { buildValley } from './map/valley.ts';
 import { PRESETS, SCHEDULES, scheduleOf } from './preset.ts';
@@ -16,11 +18,15 @@ export interface Strategy extends WireBot {
   belief(obs: Observe | null): BeliefFrame | null;
   stats(): BrainStats | null;
   decisions(): DecisionRecord | null;
+  general(): General | null;
+  lastObserve(): Observe | null;
+  world(): World | null;
 }
 
 class BrainStrategy implements Strategy {
   private brain: Brain | null = null;
   private readonly schedule: Schedule;
+  private last: Observe | null = null;
 
   constructor(schedule: Schedule) {
     this.schedule = schedule;
@@ -36,6 +42,7 @@ class BrainStrategy implements Strategy {
   tick(observe: Uint8Array): Uint8Array {
     const obs = decodeObserve(observe);
     if (!obs || !this.brain) return encodeOrders([]);
+    this.last = obs;
     return encodeOrders(this.brain.tick(obs));
   }
 
@@ -54,6 +61,18 @@ class BrainStrategy implements Strategy {
 
   decisions(): DecisionRecord | null {
     return this.brain && this.brain.world.t > 0 ? this.brain.decisions() : null;
+  }
+
+  general(): General | null {
+    return this.brain ? this.brain.memo.general : null;
+  }
+
+  lastObserve(): Observe | null {
+    return this.last;
+  }
+
+  world(): World | null {
+    return this.brain ? this.brain.world : null;
   }
 }
 
