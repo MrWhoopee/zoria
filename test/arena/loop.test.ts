@@ -13,6 +13,7 @@ function fakeSession(ticks: number) {
     command: (c: unknown) => commands.push(c),
     done: () => t >= ticks,
     reveal: () => (t >= ticks ? ({ own: {}, units: [] } as never) : null),
+    record: () => ({ v: 1, t } as never),
   };
 }
 
@@ -119,4 +120,20 @@ test('an error inside a tick stops the loop and is reported', () => {
   assert.equal(timers.filter((x) => x.live).length, 0);
   loop.handle({ kind: 'step' });
   assert.equal(posts.filter((p) => p.kind === 'error').length, 2);
+});
+
+test('a record is posted once when the match ends and for an unfinished match on a new start', () => {
+  const h = harness(2);
+  h.loop.handle(start);
+  h.loop.handle({ kind: 'step' });
+  h.loop.handle(start);
+  h.loop.handle({ kind: 'step' });
+  h.loop.handle({ kind: 'step' });
+  h.loop.handle({ kind: 'step' });
+  const recs = h.posts.filter((p) => p.kind === 'record');
+  assert.deepEqual(recs.map((p) => p.kind === 'record' && (p.record as unknown as { t: number }).t), [1, 2]);
+  const fresh = harness(2);
+  fresh.loop.handle(start);
+  fresh.loop.handle(start);
+  assert.equal(fresh.posts.filter((p) => p.kind === 'record').length, 0);
 });

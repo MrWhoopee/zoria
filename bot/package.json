@@ -21,7 +21,8 @@
     "league:report": "node tools/league-report.ts",
     "mutate": "node tools/mutate.ts",
     "inspect": "node tools/inspect.ts",
-    "episode": "node tools/episode.ts"
+    "episode": "node tools/episode.ts",
+    "arena:review": "node tools/arena-review.ts"
   },
   "zaria": {
     "bot": "node dist/main.js",

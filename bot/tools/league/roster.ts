@@ -3,6 +3,7 @@ import type { PackSeat } from '@zoria/sdk';
 import { NAKAZ_SAMPLES, createNakazSparring } from '@zoria/sdk/nakaz';
 import { PRESETS, SCHEDULES, scheduleOf } from '../../src/preset.ts';
 import { createStrategy } from '../../src/strategy.ts';
+export { fileSafe } from '../../arena/names.ts';
 
 export type SeatKind = 'preset' | 'archetype' | 'mutant' | 'nakaz';
 
@@ -47,6 +48,3 @@ export function seatOf(name: string): PackSeat {
 export const ARCHETYPE_NAMES = Object.keys(archetypes);
 export const NAKAZ_NAMES = Object.keys(samples);
 
-export function fileSafe(name: string): string {
-  return name.replace(/[<>:"/\\|?*]/g, '_');
-}

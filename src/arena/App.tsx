@@ -62,7 +62,7 @@ export function App() {
             <p>Обери жереб, свій слот і двох суперників, потім натисни «Почати бій».</p>
           </div>
         )}
-        <Panel slot={map?.slot ?? 'A'} frame={frame} selected={selected} revealed={revealed} onSelect={setSelected} onCommand={arena.command} onReveal={reveal} />
+        <Panel slot={map?.slot ?? 'A'} frame={frame} selected={selected} revealed={revealed} saved={arena.saved} onSelect={setSelected} onCommand={arena.command} onReveal={reveal} />
       </main>
       {menu ? (
         <Menu

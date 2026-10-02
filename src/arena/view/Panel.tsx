@@ -7,7 +7,7 @@ const SLOTS: SlotName[] = ['A', 'B', 'C'];
 const TASK: Record<string, string> = { idle: 'стоїть', jam: 'глушить', ram: 'таранить', build: 'будує', home: 'додому', move: 'іде', work: 'працює' };
 const GOAL: Record<string, string> = { jam: 'глушити', ram: 'таранити', build: 'будувати' };
 
-export function Panel({ slot, frame, selected, revealed, onSelect, onCommand, onReveal }: { slot: SlotName; frame: ArenaFrame | null; selected: string | null; revealed: boolean; onSelect: (id: string | null) => void; onCommand: (c: GeneralCommand) => void; onReveal: () => void }) {
+export function Panel({ slot, frame, selected, revealed, saved, onSelect, onCommand, onReveal }: { slot: SlotName; frame: ArenaFrame | null; selected: string | null; revealed: boolean; saved: string; onSelect: (id: string | null) => void; onCommand: (c: GeneralCommand) => void; onReveal: () => void }) {
   if (!frame) return <aside className="panel"><p className="hint">Обери суперників і натисни «Почати бій». Бій стартує на паузі.</p></aside>;
   const places = [...frame.score].map((s, i) => ({ slot: SLOTS[i] ?? 'A', s })).sort((a, b) => b.s - a.s);
   return (
@@ -30,6 +30,7 @@ export function Panel({ slot, frame, selected, revealed, onSelect, onCommand, on
           <div className="result">
             {frame.place === 1 ? 'Перемога: перше місце.' : 'Місце ' + frame.place + ' з 3.'}
             <button onClick={onReveal}>{revealed ? 'Сховати карту' : 'Показати всю карту'}</button>
+            {saved ? <small className="saved">Бій записано: {saved}</small> : null}
           </div>
         ) : null}
       </section>

@@ -13,6 +13,7 @@ export interface Arena {
   running: boolean;
   speed: number;
   error: string;
+  saved: string;
   start(o: StartOpts): void;
   pause(): void;
   resume(): void;
@@ -32,6 +33,7 @@ export function useArena(): Arena {
   const [running, setRunning] = useState(false);
   const [speed, setSpeedState] = useState(1);
   const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
 
   useEffect(() => {
     const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
@@ -40,6 +42,12 @@ export function useArena(): Arena {
       const m = e.data;
       if (m.kind === 'names') setNames(m.names);
       else if (m.kind === 'error') setError(m.message);
+      else if (m.kind === 'record') {
+        fetch('/arena-log', { method: 'POST', body: JSON.stringify(m.record) })
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error('запис не збережено: ' + r.status))))
+          .then((x: { name: string }) => setSaved(x.name))
+          .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+      }
       else if (m.kind === 'map') {
         game.current = m.game;
         setMap(m.map);
@@ -64,6 +72,7 @@ export function useArena(): Arena {
     running,
     speed,
     error,
+    saved,
     start: (o) => {
       setError('');
       setRunning(false);

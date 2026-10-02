@@ -54,3 +54,44 @@ test('the map lists the start needles and a moving unit reads as moving', async 
   assert.equal(taskOf({ task: { ...base, goal: { q: 1, r: 1 }, path: 0 } }), 'idle');
   assert.equal(taskOf({ task: null }), 'idle');
 });
+
+test('a session records the commands with their ticks and the result, and a replay reproduces it', async () => {
+  const { replay } = await import('../arena/replay.ts');
+  const s = new Session({ seed: 100, slot: 'A', rivals: ['глушій', 'рівний'], preset: 'глушій' });
+  let f = s.step();
+  for (let i = 0; i < 60 && f; i++) f = s.step();
+  const u = f?.units[0];
+  assert.ok(u);
+  s.command({ kind: 'take', unit: u.id });
+  s.command({ kind: 'order', order: { kind: 'halt', unit: u.id } });
+  let last = f;
+  for (f = s.step(); f; f = s.step()) last = f;
+  const rec = s.record();
+  assert.deepEqual([rec.v, rec.seed, rec.slot, rec.rivals, rec.preset], [1, 100, 'A', ['глушій', 'рівний'], 'глушій']);
+  assert.deepEqual(rec.commands.map((x) => [x.t, x.c.kind]), [[61, 'take'], [61, 'order']]);
+  assert.deepEqual(rec.end, { t: 1200, done: true, score: last?.score, place: last?.place });
+  const again = replay(rec, true);
+  assert.deepEqual(again.final.score, last?.score);
+  const alone = replay(rec, false);
+  const plain = new Session({ seed: 100, slot: 'A', rivals: ['глушій', 'рівний'], preset: 'глушій' });
+  let p = plain.step();
+  let lastPlain = p;
+  for (; p; p = plain.step()) lastPlain = p;
+  assert.deepEqual(alone.final.score, lastPlain?.score);
+  assert.equal(again.scores.length, 1200);
+});
+
+test('records save under a safe name inside the arena folder only', async () => {
+  const { mkdtempSync, readdirSync, readFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { saveRecord } = await import('../arena/save.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'arena-'));
+  const rec = { v: 1, at: '2026-10-02T12:00:00.000Z', seed: 10, slot: 'A', rivals: ['глушій', '../x>y'], preset: 'глушій', commands: [], end: null };
+  const name = saveRecord(dir, JSON.stringify(rec));
+  assert.equal(name, '2026-10-02T12-00-00-s10-A-глушій-.._x_y.json');
+  assert.deepEqual(readdirSync(dir), [name]);
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, name), 'utf8')), rec);
+  assert.throws(() => saveRecord(dir, '{"v":2}'), /bad arena record/);
+  assert.throws(() => saveRecord(dir, 'not json'), /bad arena record/);
+});

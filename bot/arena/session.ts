@@ -11,6 +11,7 @@ import { createStrategy } from '../src/strategy.ts';
 import type { Strategy } from '../src/strategy.ts';
 import { frameOf } from './frame.ts';
 import type { ArenaFrame, ArenaMap, RevealFrame } from './frame.ts';
+import type { ArenaRecord } from './record.ts';
 import { rivalSeat } from './roster.ts';
 
 const SLOTS: SlotName[] = ['A', 'B', 'C'];
@@ -32,9 +33,12 @@ export class Session {
   private readonly me: Strategy;
   private readonly slot: SlotName;
   private pending: GeneralCommand[] = [];
+  private readonly rec: ArenaRecord;
+  private last: ArenaFrame | null = null;
 
-  constructor(o: SessionOpts) {
+  constructor(o: SessionOpts, at: string = new Date().toISOString()) {
     this.slot = o.slot;
+    this.rec = { v: 1, at, seed: o.seed, slot: o.slot, rivals: [o.rivals[0], o.rivals[1]], preset: o.preset, commands: [], end: null };
     this.me = createStrategy(o.preset);
     const bots: Partial<Record<SlotName, WireBot>> = { [o.slot]: this.me };
     const styles: Partial<Record<SlotName, Record<string, unknown>>> = {};
@@ -67,13 +71,24 @@ export class Session {
   step(): ArenaFrame | null {
     if (this.m.done()) return null;
     const g = this.me.general();
-    if (g) for (const c of this.pending.splice(0)) applyCommand(g, c, this.m.t());
+    if (g) {
+      for (const c of this.pending.splice(0)) {
+        applyCommand(g, c, this.m.t());
+        this.rec.commands.push({ t: this.m.t(), c });
+      }
+    }
     this.m.step();
     const obs = this.me.lastObserve();
     const w = this.me.world();
     const after = this.me.general();
     if (!obs || !w || !after) return null;
-    return frameOf(this.slot, w, obs, after, this.me.decisions(), this.m.done());
+    this.last = frameOf(this.slot, w, obs, after, this.me.decisions(), this.m.done());
+    return this.last;
+  }
+
+  record(): ArenaRecord {
+    const f = this.last;
+    return { ...this.rec, commands: [...this.rec.commands], end: f ? { t: f.t, done: f.done, score: f.score, place: f.place } : null };
   }
 
   reveal(): RevealFrame | null {

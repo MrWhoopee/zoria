@@ -1,4 +1,5 @@
 import type { ArenaFrame, ArenaMap, RevealFrame } from '../../bot/arena/frame.ts';
+import type { ArenaRecord } from '../../bot/arena/record.ts';
 import type { GeneralCommand } from '../../bot/src/general.ts';
 import type { FromWorker, ToWorker } from './protocol.ts';
 
@@ -13,6 +14,7 @@ export interface SessionLike {
   command(c: GeneralCommand): void;
   done(): boolean;
   reveal(): RevealFrame | null;
+  record(): ArenaRecord;
 }
 
 export class Loop {
@@ -21,6 +23,8 @@ export class Loop {
   private speed = 1;
   private timer: unknown = null;
   private running = false;
+  private ticked = false;
+  private saved = false;
   private readonly post: (m: FromWorker) => void;
   private readonly schedule: (fn: () => void, ms: number) => unknown;
   private readonly cancel: (h: unknown) => void;
@@ -36,7 +40,11 @@ export class Loop {
   handle(m: ToWorker): void {
     if (m.kind === 'start') {
       this.stop();
+      this.save();
       this.game++;
+      this.s = null;
+      this.ticked = false;
+      this.saved = false;
       this.s = this.make(m);
       this.post({ kind: 'map', game: this.game, map: this.s.map });
     } else if (m.kind === 'resume') {
@@ -77,11 +85,21 @@ export class Loop {
     if (!this.s || game !== this.game) return;
     try {
       const f = this.s.step();
-      if (f) this.post({ kind: 'frame', game, frame: f });
+      if (f) {
+        this.ticked = true;
+        this.post({ kind: 'frame', game, frame: f });
+        if (f.done) this.save();
+      }
     } catch (err) {
       this.stop();
       this.post({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
     }
+  }
+
+  private save(): void {
+    if (!this.s || !this.ticked || this.saved) return;
+    this.saved = true;
+    this.post({ kind: 'record', record: this.s.record() });
   }
 
   private clear(): void {
