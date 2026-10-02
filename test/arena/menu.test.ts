@@ -7,7 +7,7 @@ const frame = {
   own: { '5,-8': 'A', '6,6': 'B', '0,0': 'K', '7,-13': 'A' },
   foe: [['T-A3', 'A', 'ткач', 7, 2]],
 } as unknown as ArenaFrame;
-const map = { slot: 'B', cells: [], seats: { A: { q: 6, r: -12 }, B: { q: 6, r: 6 }, C: { q: -12, r: 6 } }, ring: [], starts: [{ q: 7, r: -13 }] } as unknown as ArenaMap;
+const map = { slot: 'B', cells: [[2, 2, 'water', 0], [3, 3, 'mount', 0], [1, 1, 'meadow', 0], [7, 2, 'bare', 0]], seats: { A: { q: 6, r: -12 }, B: { q: 6, r: 6 }, C: { q: -12, r: 6 } }, ring: [], starts: [{ q: 7, r: -13 }] } as unknown as ArenaMap;
 const kl: ArenaUnit = { id: 'K-B7', cls: 'клинок', q: 5, r: -7, manual: true, goal: null, task: 'idle' };
 const tk: ArenaUnit = { id: 'T-B1', cls: 'ткач', q: 6, r: 6, manual: false, goal: null, task: 'idle' };
 const labels = (xs: { label: string }[]) => xs.map((x) => x.label);
@@ -37,4 +37,9 @@ test('with nothing selected the menu gives the bot goals for the cell', () => {
 test('shielded start needles are never offered for jamming', () => {
   assert.deepEqual(menuItems(frame, map, { q: 7, r: -13 }, null), []);
   assert.deepEqual(labels(menuItems(frame, map, { q: 7, r: -13 }, kl)), ['Відпустити', 'Рух', 'Стоп', 'Додому']);
+});
+
+test('build is never offered on water or mountains', () => {
+  assert.deepEqual(menuItems(frame, map, { q: 2, r: 2 }, null), []);
+  assert.deepEqual(labels(menuItems(frame, map, { q: 3, r: 3 }, tk)), ['Перехопити', 'Рух', 'Стоп', 'Додому']);
 });

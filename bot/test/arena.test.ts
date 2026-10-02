@@ -51,6 +51,6 @@ test('the map lists the start needles and a moving unit reads as moving', async 
   assert.equal(s.map.starts.length, 6);
   const base = { goal: null, site: null, feed: null, jam: null, ram: null, home: false, path: 0 };
   assert.equal(taskOf({ task: { ...base, path: 3 } }), 'move');
-  assert.equal(taskOf({ task: { ...base, path: 0 } }), 'work');
+  assert.equal(taskOf({ task: { ...base, goal: { q: 1, r: 1 }, path: 0 } }), 'idle');
   assert.equal(taskOf({ task: null }), 'idle');
 });

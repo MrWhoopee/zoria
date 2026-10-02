@@ -8,12 +8,15 @@ export interface MenuItem {
 
 type Hex = { q: number; r: number };
 
+const NO_BUILD = new Set(['water', 'mount']);
+
 export function menuItems(frame: ArenaFrame, map: ArenaMap, cell: Hex, unit: ArenaUnit | null): MenuItem[] {
   const slot = map.slot;
   const owner = frame.own[cell.q + ',' + cell.r];
   const shielded = map.starts.some((s) => s.q === cell.q && s.r === cell.r);
   const foeNeedle = owner !== undefined && owner !== null && owner !== slot && owner !== 'K' && !shielded;
-  const empty = owner === undefined;
+  const terrain = map.cells.find((c) => c[0] === cell.q && c[1] === cell.r)?.[2];
+  const empty = owner === undefined && terrain !== undefined && !NO_BUILD.has(terrain);
   const foe = frame.foe.find((f) => f[3] === cell.q && f[4] === cell.r);
   if (!unit) {
     const out: MenuItem[] = [];

@@ -2,7 +2,7 @@ import type { ClsName, MineUnit, Order } from '@zoria/protocol';
 import { dist, keyOf } from './hex.ts';
 import type { Cell } from './hex.ts';
 import { bytesFor } from './plans/types.ts';
-import type { Ctx, Task } from './plans/types.ts';
+import type { Ctx, Memo, Task } from './plans/types.ts';
 
 export type GoalKind = 'jam' | 'ram' | 'build';
 
@@ -118,8 +118,17 @@ export const GOAL_SIGHT_TICKS = 20;
 
 const none = (): void => undefined;
 
-function goalTask(ctx: Ctx, u: MineUnit, tag: string, order: Order, to: Cell): Task {
-  return { tag, unit: u.id, order, value: GENERAL_VALUE - dist(u, to), bytes: bytesFor(ctx, order.kind, u), energy: 0, commit: none, refused: none };
+function free(u: MineUnit): boolean {
+  const t = u.task;
+  return t === null || (t.site === null && t.jam === null && t.ram === null && t.feed === null && t.path === 0);
+}
+
+function goalTask(ctx: Ctx, u: MineUnit, tag: string, order: Order, to: Cell, id: number): Task {
+  const refused = (m: Memo, code: number): void => {
+    m.general.goals = m.general.goals.filter((x) => x.id !== id);
+    note(m.general, 't' + ctx.w.t + ': наказ ' + id + ' (' + order.kind + ') відмова ' + code + ', знято');
+  };
+  return { tag, unit: u.id, order, value: GENERAL_VALUE - dist(u, to), bytes: bytesFor(ctx, order.kind, u), energy: 0, commit: none, refused };
 }
 
 function goalTasks(ctx: Ctx): Task[] {
@@ -127,6 +136,7 @@ function goalTasks(ctx: Ctx): Task[] {
   const g = ctx.memo.general;
   const alive = new Map(w.units.map((u) => [u.id, u]));
   const taken = new Set([...g.manual]);
+  for (const x of g.goals) if (x.unit && g.manual.has(x.unit)) x.unit = null;
   for (const x of g.goals) if (x.unit && alive.has(x.unit)) taken.add(x.unit);
   const out: Task[] = [];
   const keep: Goal[] = [];
@@ -169,10 +179,10 @@ function goalTasks(ctx: Ctx): Task[] {
     if (!u) continue;
     if (x.kind === 'jam' && x.cell) {
       const holding = u.task?.jam?.q === x.cell.q && u.task.jam.r === x.cell.r;
-      if (dist(u, x.cell) <= 1 && !holding) out.push(goalTask(ctx, u, 'general:jam', { kind: 'jam', unit: u.id, target: x.cell, hold: true }, x.cell));
-      else if (dist(u, x.cell) > 1 && u.task === null) out.push(goalTask(ctx, u, 'general:jam', { kind: 'move', unit: u.id, q: x.cell.q, r: x.cell.r, goal: null, home: false }, x.cell));
-    } else if (x.kind === 'ram' && foe && x.target && u.task?.ram !== x.target) out.push(goalTask(ctx, u, 'general:ram', { kind: 'ram', unit: u.id, target: x.target }, to));
-    else if (x.kind === 'build' && x.cell && u.task === null) out.push(goalTask(ctx, u, 'general:build', { kind: 'needle', unit: u.id, q: x.cell.q, r: x.cell.r }, x.cell));
+      if (dist(u, x.cell) <= 1 && !holding) out.push(goalTask(ctx, u, 'general:jam', { kind: 'jam', unit: u.id, target: x.cell, hold: true }, x.cell, x.id));
+      else if (dist(u, x.cell) > 1 && free(u)) out.push(goalTask(ctx, u, 'general:jam', { kind: 'move', unit: u.id, q: x.cell.q, r: x.cell.r, goal: null, home: false }, x.cell, x.id));
+    } else if (x.kind === 'ram' && foe && x.target && u.task?.ram !== x.target) out.push(goalTask(ctx, u, 'general:ram', { kind: 'ram', unit: u.id, target: x.target }, to, x.id));
+    else if (x.kind === 'build' && x.cell && free(u)) out.push(goalTask(ctx, u, 'general:build', { kind: 'needle', unit: u.id, q: x.cell.q, r: x.cell.r }, x.cell, x.id));
   }
   g.goals = keep;
   return out;

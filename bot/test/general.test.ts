@@ -157,3 +157,28 @@ test('a jam goal on a shielded start needle is dropped with a note', () => {
   assert.equal(ctx.memo.general.goals.length, 0);
   assert.match(ctx.memo.general.notes.at(-1) ?? '', /щит/);
 });
+
+test('a parked unit with a finished move still takes a goal and acts on it', () => {
+  const parked = { goal: { q: 6, r: 6 }, site: null, feed: null, jam: null, ram: null, home: false, path: 0 };
+  const ctx = ctxOf('B', withUnits([tkach('T-B1', 6, 6, { task: parked })]));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'build', cell: { q: 9, r: 2 } }, 50);
+  assert.deepEqual(general(ctx)[0]?.order, { kind: 'needle', unit: 'T-B1', q: 9, r: 2 });
+});
+
+test('a goal lets go of a unit the owner takes and finds another', () => {
+  const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 7, r: 2 }];
+  const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6), klinok('K-B8', 5, 7)] }, foe }));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'ram', target: 'T-A3' }, 60);
+  assert.equal(general(ctx)[0]?.unit, 'K-B7');
+  applyCommand(ctx.memo.general, { kind: 'take', unit: 'K-B7' }, 61);
+  const next = general(ctx).filter((t) => t.tag === 'general:ram');
+  assert.deepEqual(next.map((t) => t.unit), ['K-B8']);
+});
+
+test('a refused goal order drops the goal with a note', () => {
+  const ctx = ctxOf('B', withUnits([tkach('T-B1', 6, 6)]));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'build', cell: { q: 9, r: 2 } }, 50);
+  general(ctx)[0]?.refused(ctx.memo, 11);
+  assert.equal(ctx.memo.general.goals.length, 0);
+  assert.match(ctx.memo.general.notes.at(-1) ?? '', /відмова/);
+});

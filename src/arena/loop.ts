@@ -69,14 +69,19 @@ export class Loop {
       this.timer = null;
       if (game !== this.game || !this.running) return;
       this.tick(game);
-      this.arm();
+      if (this.running) this.arm();
     }, TICK_MS / this.speed);
   }
 
   private tick(game: number): void {
     if (!this.s || game !== this.game) return;
-    const f = this.s.step();
-    if (f) this.post({ kind: 'frame', game, frame: f });
+    try {
+      const f = this.s.step();
+      if (f) this.post({ kind: 'frame', game, frame: f });
+    } catch (err) {
+      this.stop();
+      this.post({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
   }
 
   private clear(): void {

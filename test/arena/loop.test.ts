@@ -102,3 +102,21 @@ test('commands reach the session, reveal only after the end, speeds are fixed', 
   assert.equal(h.posts.filter((p) => p.kind === 'reveal').length, 1);
   assert.deepEqual(SPEEDS, [0.25, 0.5, 1, 2, 4, 8]);
 });
+
+test('an error inside a tick stops the loop and is reported', () => {
+  const posts: FromWorker[] = [];
+  const timers: { fn: () => void; live: boolean }[] = [];
+  const broken = { map: { slot: 'A', cells: [], seats: {}, ring: [], starts: [] }, step: () => { throw new Error('boom'); }, command: () => undefined, done: () => false, reveal: () => null };
+  const loop = new Loop((m) => posts.push(m), (fn) => { const h = { fn, live: true }; timers.push(h); return h; }, (h) => { (h as { live: boolean }).live = false; }, () => broken as never);
+  loop.handle(start);
+  loop.handle({ kind: 'resume' });
+  const fired = timers.at(-1);
+  if (fired) {
+    fired.live = false;
+    fired.fn();
+  }
+  assert.deepEqual(posts.filter((p) => p.kind === 'error').map((p) => p.kind === 'error' && p.message), ['boom']);
+  assert.equal(timers.filter((x) => x.live).length, 0);
+  loop.handle({ kind: 'step' });
+  assert.equal(posts.filter((p) => p.kind === 'error').length, 2);
+});

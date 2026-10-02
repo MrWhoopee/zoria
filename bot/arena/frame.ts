@@ -62,8 +62,8 @@ export function taskOf(u: Pick<World['units'][number], 'task'>): string {
   if (t.ram) return 'ram';
   if (t.site) return 'build';
   if (t.home) return 'home';
-  if (t.goal || t.path > 0) return 'move';
-  return 'work';
+  if (t.path > 0) return 'move';
+  return 'idle';
 }
 
 export function frameOf(slot: SlotName, w: World, obs: Observe, g: General, d: DecisionRecord | null, done: boolean): ArenaFrame {
