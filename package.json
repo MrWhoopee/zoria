@@ -11,6 +11,7 @@
     "agent": "node src/agent/main.ts",
     "dev:client": "vite",
     "build:client": "vite build",
+    "arena": "vite --config vite.arena.config.ts",
     "encode:photo": "node scripts/encode-photo.ts"
   },
   "dependencies": {
