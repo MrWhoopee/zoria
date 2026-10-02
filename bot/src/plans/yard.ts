@@ -15,7 +15,8 @@ export function yard(ctx: Ctx): Task[] {
   const tkTarget = swapped ? preset.tkachTarget + 1 : preset.tkachTarget;
   const klTarget = swapped ? Math.max(0, preset.klinokTarget - 2) : preset.klinokTarget;
   const guardFirst = preset.guardFirst > 0 && kl === 0 && klTarget > 0 && tk >= Math.min(2, tkTarget);
-  const cls: ClsName | null = guardFirst ? 'клинок' : tk < tkTarget ? 'ткач' : kl < klTarget ? 'клинок' : null;
+  const auto: ClsName | null = guardFirst ? 'клинок' : tk < tkTarget ? 'ткач' : kl < klTarget ? 'клинок' : null;
+  const cls: ClsName | null = memo.general.yardNext ?? auto;
   if (cls === null) return [];
   const cost = cfg(v, cls === 'ткач' ? 'costTkach' : 'costKlinok');
   if (weight + weightOfCls(cls) > cfg(v, 'squadWeight') || w.energy < cost) return [];
@@ -30,6 +31,7 @@ export function yard(ctx: Ctx): Task[] {
       energy: cost,
       commit: (m, t) => {
         m.pendingYard.push({ cls, eta: t + eta });
+        m.general.yardNext = null;
       },
       refused: (m) => {
         m.pendingYard.pop();

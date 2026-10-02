@@ -106,3 +106,17 @@ test('the swap rule never builds past the swarm weight', () => {
   const full = [tkach('T-B1', 6, 6), tkach('T-B2', 6, 7), klinok('K-B3'), klinok('K-B4'), klinok('K-B5'), klinok('K-B6')];
   assert.deepEqual(yard(ctxOf('B', swarm(360, full), 2026, presetOf('глушій+swap=300'))), []);
 });
+
+test('the general can pick the next yard class once', () => {
+  const units = [tkach('T-B1', 6, 6), tkach('T-B2', 6, 7)];
+  const ctx = ctxOf('B', swarm(200, units), 2026, presetOf('глушій'));
+  ctx.memo.general.yardNext = 'ткач';
+  const t = yard(ctx)[0];
+  assert.deepEqual(t?.order, { kind: 'yard', cls: 'ткач' });
+  t?.commit(ctx.memo, 400);
+  assert.equal(ctx.memo.general.yardNext, null);
+  const full = [tkach('T-B1', 6, 6), tkach('T-B2', 6, 7), tkach('T-B3', 6, 7), tkach('T-B4', 6, 7)];
+  const fullCtx = ctxOf('B', swarm(200, full), 2026, presetOf('глушій'));
+  fullCtx.memo.general.yardNext = 'клинок';
+  assert.deepEqual(yard(fullCtx), []);
+});
