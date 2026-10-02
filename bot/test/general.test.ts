@@ -1,4 +1,5 @@
 import test from 'node:test';
+import type { MineUnit } from '@zoria/protocol';
 import assert from 'node:assert/strict';
 import { GENERAL_VALUE, applyCommand, general, newGeneral, note, reserved } from '../src/general.ts';
 import { newMemo } from '../src/plans/types.ts';
@@ -93,4 +94,55 @@ test('orders for a unit that is gone are dropped with a note and the unit releas
   assert.deepEqual(general(ctx), []);
   assert.equal(ctx.memo.general.manual.size, 0);
   assert.equal(ctx.memo.general.notes.length, 1);
+});
+
+function klinok(id: string, q: number, r: number, over: Partial<MineUnit> = {}): MineUnit {
+  return { ...tkach(id, q, r), cls: 'клинок', ...over };
+}
+
+const foeNeedle = { q: 5, r: -8, owner: 'A' as const, dark: false };
+
+test('a jam goal sends the nearest free Klinok to the needle and then holds it', () => {
+  const far = makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 5, -2), klinok('K-B8', 6, 6), tkach('T-B1', 5, -3)] }, own: [foeNeedle] });
+  const ctx = ctxOf('B', far);
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'jam', cell: { q: 5, r: -8 } }, 60);
+  assert.deepEqual(general(ctx).map((x) => [x.tag, x.unit, x.order]), [['general:jam', 'K-B7', { kind: 'move', unit: 'K-B7', q: 5, r: -8, goal: null, home: false }]]);
+  ctx.w.update(makeObs({ t: 61, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 5, -7), klinok('K-B8', 6, 6)] }, own: [foeNeedle] }));
+  assert.deepEqual(general(ctx)[0]?.order, { kind: 'jam', unit: 'K-B7', target: { q: 5, r: -8 }, hold: true });
+});
+
+test('a jam goal on a needle that is no longer a foe one is done', () => {
+  const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 5, -7)] }, own: [{ ...foeNeedle, owner: 'B' }] }));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'jam', cell: { q: 5, r: -8 } }, 60);
+  assert.deepEqual(general(ctx), []);
+  assert.equal(ctx.memo.general.goals.length, 0);
+});
+
+test('a ram goal chases a visible foe and is dropped after it stays out of sight', () => {
+  const foe = [{ id: 'T-A3', p: 'A' as const, cls: 'ткач' as const, q: 7, r: 2 }];
+  const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6)] }, foe }));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'ram', target: 'T-A3' }, 60);
+  assert.deepEqual(general(ctx)[0]?.order, { kind: 'ram', unit: 'K-B7', target: 'T-A3' });
+  ctx.w.update(makeObs({ t: 70, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6)] } }));
+  assert.equal(general(ctx).length, 0);
+  assert.equal(ctx.memo.general.goals.length, 1);
+  ctx.w.update(makeObs({ t: 81, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 6, 6)] } }));
+  general(ctx);
+  assert.equal(ctx.memo.general.goals.length, 0);
+});
+
+test('a build goal sends an idle Tkach and ends when our needle stands there', () => {
+  const ctx = ctxOf('B', withUnits([tkach('T-B1', 6, 6), klinok('K-B7', 9, 2)]));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'build', cell: { q: 9, r: 2 } }, 50);
+  assert.deepEqual(general(ctx)[0]?.order, { kind: 'needle', unit: 'T-B1', q: 9, r: 2 });
+  ctx.w.update(makeObs({ t: 70, mine: { ...makeObs().mine, needles: [...starts, { q: 9, r: 2, dark: false, fed: false, weight: 1 }], units: [tkach('T-B1', 9, 2)] } }));
+  assert.deepEqual(general(ctx), []);
+  assert.equal(ctx.memo.general.goals.length, 0);
+});
+
+test('manual units and units on other goals are never picked for a goal', () => {
+  const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [klinok('K-B7', 5, -7), klinok('K-B8', 6, 6)] }, own: [foeNeedle] }));
+  applyCommand(ctx.memo.general, { kind: 'take', unit: 'K-B7' }, 60);
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'jam', cell: { q: 5, r: -8 } }, 60);
+  assert.equal(general(ctx)[0]?.unit, 'K-B8');
 });

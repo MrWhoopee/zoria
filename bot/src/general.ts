@@ -1,4 +1,5 @@
-import type { ClsName, Order } from '@zoria/protocol';
+import type { ClsName, MineUnit, Order } from '@zoria/protocol';
+import { dist, keyOf } from './hex.ts';
 import type { Cell } from './hex.ts';
 import { bytesFor } from './plans/types.ts';
 import type { Ctx, Task } from './plans/types.ts';
@@ -12,6 +13,7 @@ export interface Goal {
   target: string | null;
   unit: string | null;
   since: number;
+  seen: number;
 }
 
 export interface General {
@@ -66,7 +68,7 @@ export function applyCommand(g: General, c: GeneralCommand, t: number): void {
       note(g, 't' + t + ': наказ ' + c.goal + ' без цілі');
       return;
     }
-    g.goals.push({ id: g.nextId++, kind: c.goal, cell, target, unit: null, since: t });
+    g.goals.push({ id: g.nextId++, kind: c.goal, cell, target, unit: null, since: t, seen: t });
   } else if (c.kind === 'cancel') g.goals = g.goals.filter((x) => x.id !== c.id);
   else g.yardNext = c.cls;
 }
@@ -112,6 +114,66 @@ function manualTasks(ctx: Ctx): Task[] {
   return out;
 }
 
+export const GOAL_SIGHT_TICKS = 20;
+
+const none = (): void => undefined;
+
+function goalTask(ctx: Ctx, u: MineUnit, tag: string, order: Order, to: Cell): Task {
+  return { tag, unit: u.id, order, value: GENERAL_VALUE - dist(u, to), bytes: bytesFor(ctx, order.kind, u), energy: 0, commit: none, refused: none };
+}
+
+function goalTasks(ctx: Ctx): Task[] {
+  const { w, v } = ctx;
+  const g = ctx.memo.general;
+  const alive = new Map(w.units.map((u) => [u.id, u]));
+  const taken = new Set([...g.manual]);
+  for (const x of g.goals) if (x.unit && alive.has(x.unit)) taken.add(x.unit);
+  const out: Task[] = [];
+  const keep: Goal[] = [];
+  for (const x of g.goals) {
+    const foe = x.target ? w.foe.find((f) => f.id === x.target) : undefined;
+    if (foe) x.seen = w.t;
+    const to: Cell | null = x.cell ?? (foe ? { q: foe.q, r: foe.r } : null);
+    const where = keyOf(x.cell ?? v.base);
+    const owner = x.cell ? w.owner.get(keyOf(x.cell)) ?? null : null;
+    const foeOwned = owner !== null && owner !== v.slot && owner !== 'K';
+    if (x.kind === 'jam' && !foeOwned) {
+      note(g, 't' + w.t + ': глушити ' + where + ' - готово або неможливо');
+      continue;
+    }
+    if (x.kind === 'build' && owner === v.slot) {
+      note(g, 't' + w.t + ': голка ' + where + ' стоїть');
+      continue;
+    }
+    if (x.kind === 'build' && owner !== null) {
+      note(g, 't' + w.t + ': соту ' + where + ' зайнято');
+      continue;
+    }
+    if (x.kind === 'ram' && !foe && w.t - x.seen > GOAL_SIGHT_TICKS) {
+      note(g, 't' + w.t + ': ' + (x.target ?? '?') + ' зник з поля зору');
+      continue;
+    }
+    keep.push(x);
+    if (!to) continue;
+    let u = x.unit ? alive.get(x.unit) : undefined;
+    if (!u) {
+      const cls = x.kind === 'build' ? 'ткач' : 'клинок';
+      u = w.units.filter((m) => m.cls === cls && !taken.has(m.id)).sort((a, b) => dist(a, to) - dist(b, to) || a.id.localeCompare(b.id))[0];
+      x.unit = u ? u.id : null;
+      if (u) taken.add(u.id);
+    }
+    if (!u) continue;
+    if (x.kind === 'jam' && x.cell) {
+      const holding = u.task?.jam?.q === x.cell.q && u.task.jam.r === x.cell.r;
+      if (dist(u, x.cell) <= 1 && !holding) out.push(goalTask(ctx, u, 'general:jam', { kind: 'jam', unit: u.id, target: x.cell, hold: true }, x.cell));
+      else if (dist(u, x.cell) > 1 && u.task === null) out.push(goalTask(ctx, u, 'general:jam', { kind: 'move', unit: u.id, q: x.cell.q, r: x.cell.r, goal: null, home: false }, x.cell));
+    } else if (x.kind === 'ram' && foe && x.target && u.task?.ram !== x.target) out.push(goalTask(ctx, u, 'general:ram', { kind: 'ram', unit: u.id, target: x.target }, to));
+    else if (x.kind === 'build' && x.cell && u.task === null) out.push(goalTask(ctx, u, 'general:build', { kind: 'needle', unit: u.id, q: x.cell.q, r: x.cell.r }, x.cell));
+  }
+  g.goals = keep;
+  return out;
+}
+
 export function general(ctx: Ctx): Task[] {
-  return manualTasks(ctx);
+  return [...manualTasks(ctx), ...goalTasks(ctx)];
 }
