@@ -1,6 +1,8 @@
 import { orderCost } from '@zoria/protocol';
 import type { ActorName, ChannelCfg, ClsName, MineUnit, Order, OrderKind } from '@zoria/protocol';
 import type { Cell } from '../hex.ts';
+import { newGeneral } from '../general.ts';
+import type { General } from '../general.ts';
 import type { Links } from '../map/links.ts';
 import type { Preset } from '../preset.ts';
 import { cfg } from '../map/valley.ts';
@@ -26,10 +28,11 @@ export interface Memo {
   lastAccepted: number;
   banned: Map<string, number>;
   bids: Map<number, number>;
+  general: General;
 }
 
 export function newMemo(): Memo {
-  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Map(), bids: new Map() };
+  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Map(), bids: new Map(), general: newGeneral() };
 }
 
 export interface Ctx {

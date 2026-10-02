@@ -1,4 +1,3 @@
-import { performance } from 'node:perf_hooks';
 import { orderCap } from '@zoria/protocol';
 import type { ChannelCfg, Observe, Order, Verdict } from '@zoria/protocol';
 import { allocate } from './allocate.ts';
