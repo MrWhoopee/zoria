@@ -106,6 +106,14 @@ export function reconnectValue(ctx: Ctx, site: Cell, anchors: Cell[], own: Pull,
   return total;
 }
 
+export function buildNeed(ctx: Ctx): number {
+  const { v, w, preset } = ctx;
+  const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
+  const klinoks = w.units.filter((u) => u.cls === 'клинок').length;
+  const guardGap = preset.guardFirst > 0 ? Math.max(0, preset.klinokTarget - klinoks) * cfg(v, 'costKlinok') : 0;
+  return cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0) + guardGap;
+}
+
 export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved: Set<string>): Site[] {
   const { v, w, links, memo, preset } = ctx;
   const out: Site[] = [];
@@ -131,11 +139,8 @@ export function sites(ctx: Ctx, anchors: Cell[], own: Pull, foe: Pull, reserved:
     const value = keeper ? gain(v, c, own, foe, cfg(v, 'dawnRing')) : takeGain(v, c, own, foe, mult, preset.harm);
     out.push({ cell: c, kind: 'take', gain: value + back(c), work, owner: o });
   }
-  const tkachs = w.units.filter((u) => u.cls === 'ткач').length;
-  const klinoks = w.units.filter((u) => u.cls === 'клинок').length;
-  const guardGap = preset.guardFirst > 0 ? Math.max(0, preset.klinokTarget - klinoks) * cfg(v, 'costKlinok') : 0;
-  const need = cfg(v, 'costNeedle') + preset.buildReserve + (tkachs < preset.tkachTarget ? cfg(v, 'costTkach') : 0) + guardGap;
-  if (w.energy >= need) {
+  const need = buildNeed(ctx);
+  if (w.energy >= need || preset.anticipate > 0) {
     const seen = new Set<string>();
     const range = cfg(v, 'linkRange');
     for (const a of anchors) {
@@ -293,6 +298,10 @@ export function expand(ctx: Ctx): Task[] {
   const left = v.ticks - w.t;
   const taken = new Set<string>();
   const staging = w.t >= v.dawnAt - STAGE && w.t < v.dawnAt;
+  const ahead = ctx.preset.anticipate > 0;
+  const need = buildNeed(ctx);
+  const regen = (Math.min(lit.length, 8) * cfg(v, 'energyRegen')) / 4;
+  let committed = [...memo.res.values()].filter((r) => r.kind === 'build').length * cfg(v, 'costNeedle');
   for (const u of free) {
     if (staging) {
       const spot = stageSpot(ctx, u, anchors, taken);
@@ -310,6 +319,7 @@ export function expand(ctx: Ctx): Task[] {
       if (taken.has(k)) continue;
       const travel = field.get(k);
       if (travel === undefined) continue;
+      if (ahead && s.kind === 'build' && w.energy - committed + regen * travel < need) continue;
       const eta = travel + s.work;
       const score = (s.gain * rate * Math.max(0, left - eta) + contractExtra(ctx, s.cell, eta)) / Math.pow(eta + 1, ctx.preset.etaPower);
       if (score > bestScore) {
@@ -319,6 +329,7 @@ export function expand(ctx: Ctx): Task[] {
     }
     if (best) {
       taken.add(keyOf(best.cell));
+      if (best.kind === 'build') committed += cfg(v, 'costNeedle');
       tasks.push(taskFor(ctx, u, { kind: best.kind, cell: best.cell, owner: best.owner, work: best.work }, bestScore, -1));
       continue;
     }

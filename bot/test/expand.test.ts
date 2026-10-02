@@ -277,3 +277,17 @@ test('no building while the Klinok guard is short', () => {
   const rich = ctxOf('B', makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 170 }, own, mine: { ...makeObs().mine, needles: starts, units } }));
   assert.ok(expand(rich).some((t) => t.order.kind === 'needle'));
 });
+
+test('with anticipate a Tkach sets off to build when the charge will be there on arrival', () => {
+  const v = ctxOf('B', makeObs()).v;
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'K' as const, dark: true }));
+  const units = [tkach('T-B6', 6, 6), tkach('T-B7', 6, 7), tkach('T-B8', 7, 6)];
+  const obs = makeObs({ t: 200, pulse: { ...makeObs().pulse, energy: 58 }, own, mine: { ...makeObs().mine, needles: starts, units } });
+  assert.ok(expand(ctxOf('B', obs, 2026, presetOf('основний+guardFirst=0'))).every((t) => t.order.kind !== 'needle'));
+  const ahead = expand(ctxOf('B', obs, 2026, presetOf('основний+guardFirst=0+anticipate=1'))).filter((t) => t.order.kind === 'needle');
+  assert.equal(ahead.length, 1);
+  const busy = ctxOf('B', obs, 2026, presetOf('основний+guardFirst=0+anticipate=1'));
+  const [q, r] = target(ahead[0]?.order).split(',').map(Number);
+  busy.memo.res.set('T-B8', { kind: 'build', cell: { q: q ?? 0, r: r ?? 0 }, since: 199, sent: 199, owner: null, work: 8 });
+  assert.ok(expand(busy).every((t) => t.order.kind !== 'needle' || t.unit === 'T-B8'));
+});
