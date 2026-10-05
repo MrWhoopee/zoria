@@ -291,3 +291,35 @@ test('with anticipate a Tkach sets off to build when the charge will be there on
   busy.memo.res.set('T-B8', { kind: 'build', cell: { q: q ?? 0, r: r ?? 0 }, since: 199, sent: 199, owner: null, work: 8 });
   assert.ok(expand(busy).every((t) => t.order.kind !== 'needle' || t.unit === 'T-B8'));
 });
+
+test('with wary a Tkach skips a target that a foe Klinok stands next to', () => {
+  const v = ctxOf('B', makeObs()).v;
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'A' as const, dark: false }));
+  const base = { t: 200, pulse: { ...makeObs().pulse, energy: 10 }, own, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } };
+  const k = target(expand(ctxOf('B', makeObs(base)))[0]?.order);
+  const [q, r] = k.split(',').map(Number);
+  const foe = [{ id: 'K-A9', p: 'A' as const, cls: 'клинок' as const, q: (q ?? 0) + 1, r: r ?? 0 }];
+  assert.equal(target(expand(ctxOf('B', makeObs({ ...base, foe })))[0]?.order), k);
+  const wary = expand(ctxOf('B', makeObs({ ...base, foe }), 2026, presetOf('основний+wary=1')));
+  assert.ok(wary.every((t) => t.order.kind !== 'move' || target(t.order) !== k));
+});
+
+test('with wary a Tkach at work leaves when a foe Klinok comes within two cells', () => {
+  const v = ctxOf('B', makeObs()).v;
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'A' as const, dark: false }));
+  const cell = v.ruins[0]!;
+  const heating = { goal: { q: cell.q, r: cell.r }, site: null, feed: null, jam: null, ram: null, home: false, path: 0 };
+  const obs = makeObs({ t: 200, own, foe: [{ id: 'K-A9', p: 'A', cls: 'клинок', q: cell.q + 2, r: cell.r }], mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', cell.q, cell.r, { task: heating, work: 5 })] } });
+  const res = { kind: 'take' as const, cell, since: 180, sent: 180, owner: 'A' as const, work: 24, arrived: 190 };
+  const calm = ctxOf('B', obs);
+  calm.memo.res.set('T-B6', { ...res });
+  assert.ok(expand(calm).every((t) => t.tag !== 'expand:home'));
+  const ctx = ctxOf('B', obs, 2026, presetOf('основний+wary=1'));
+  ctx.memo.res.set('T-B6', { ...res });
+  const flee = expand(ctx).find((t) => t.unit === 'T-B6');
+  assert.equal(flee?.tag, 'expand:home');
+  assert.equal(ctx.memo.res.get('T-B6'), undefined);
+  flee?.commit(ctx.memo, 200);
+  assert.equal(ctx.memo.res.get('T-B6')?.kind, 'home');
+  assert.ok((ctx.memo.banned.get(keyOf(cell)) ?? 0) > 200);
+});

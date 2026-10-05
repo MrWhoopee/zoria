@@ -14,6 +14,8 @@ export const REISSUE_GAP = 6;
 export const AWAY_LIMIT = 32;
 export const HEAT_SLACK = 12;
 export const BAN_TICKS = 80;
+export const WARY_SITE = 3;
+export const WARY_FLEE = 2;
 export const REFUSE_BAN = 150;
 export const DAWN_PREP = 300;
 export const STAGE = 30;
@@ -271,9 +273,19 @@ export function expand(ctx: Ctx): Task[] {
   const tasks: Task[] = [];
   const ready = w.units.filter((u) => u.cls === 'ткач' && !midStep(u) && !u.stuck).sort((a, b) => (a.id < b.id ? -1 : 1));
   const leashed = new Set<string>();
+  const wary = ctx.preset.wary > 0;
+  const hunters = wary ? w.foe.filter((f) => f.cls === 'клинок' && f.p !== v.slot && f.p !== 'K' && f.p !== w.partner) : [];
   for (const u of ready) {
     overstayed(ctx, u);
     const r = memo.res.get(u.id);
+    if (wary && r && (r.kind === 'take' || r.kind === 'build') && u.q === r.cell.q && u.r === r.cell.r && hunters.some((f) => dist(f, u) <= WARY_FLEE)) {
+      leashed.add(u.id);
+      memo.res.delete(u.id);
+      memo.banned.set(keyOf(r.cell), w.t + BAN_TICKS);
+      const home = nearestHome(lit.length > 0 ? lit : [v.base], u);
+      tasks.push(taskFor(ctx, u, { kind: 'home', cell: home, owner: null, work: 0 }, 1e5, -1));
+      continue;
+    }
     if (r?.kind !== 'home' && leashRisk(ctx, u)) {
       leashed.add(u.id);
       if (r && (r.kind === 'take' || r.kind === 'build')) memo.banned.set(keyOf(r.cell), w.t + BAN_TICKS);
@@ -320,6 +332,7 @@ export function expand(ctx: Ctx): Task[] {
       const travel = field.get(k);
       if (travel === undefined) continue;
       if (ahead && s.kind === 'build' && w.energy - committed + regen * travel < need) continue;
+      if (wary && hunters.some((f) => dist(f, s.cell) <= WARY_SITE)) continue;
       const eta = travel + s.work;
       const score = (s.gain * rate * Math.max(0, left - eta) + contractExtra(ctx, s.cell, eta)) / Math.pow(eta + 1, ctx.preset.etaPower);
       if (score > bestScore) {
