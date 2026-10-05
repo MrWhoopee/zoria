@@ -182,3 +182,12 @@ test('a refused goal order drops the goal with a note', () => {
   assert.equal(ctx.memo.general.goals.length, 0);
   assert.match(ctx.memo.general.notes.at(-1) ?? '', /відмова/);
 });
+
+test('a take goal sends the nearest free Tkach to heat the needle and ends once it is ours', () => {
+  const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B1', 5, -2), tkach('T-B2', 6, 6), klinok('K-B7', 5, -7)] }, own: [foeNeedle] }));
+  applyCommand(ctx.memo.general, { kind: 'goal', goal: 'take', cell: { q: 5, r: -8 } }, 60);
+  assert.deepEqual(general(ctx).map((x) => [x.tag, x.order]), [['general:take', { kind: 'move', unit: 'T-B1', q: 5, r: -8, goal: { q: 5, r: -8 }, home: false }]]);
+  ctx.w.update(makeObs({ t: 90, mine: { ...makeObs().mine, needles: [...starts, { q: 5, r: -8, dark: false, fed: false, weight: 1 }], units: [tkach('T-B1', 5, -8), tkach('T-B2', 6, 6)] }, own: [{ ...foeNeedle, owner: 'B' }] }));
+  assert.deepEqual(general(ctx), []);
+  assert.equal(ctx.memo.general.goals.length, 0);
+});

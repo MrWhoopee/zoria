@@ -41,7 +41,10 @@ export function Panel({ slot, frame, selected, revealed, saved, onSelect, onComm
           {frame.units.map((u) => (
             <li key={u.id} className={u.id === selected ? 'sel' : ''} onClick={() => onSelect(u.id === selected ? null : u.id)}>
               <code>{u.id}</code>
-              <span>{TASK[u.task] ?? u.task}</span>
+              <span>
+                {TASK[u.task] ?? u.task}
+                {u.stuck ? <b className="leash bad"> завмер</b> : u.away > 0 ? <b className={u.away >= 30 ? 'leash bad' : 'leash'}> поза зв'язком {u.away}/40</b> : null}
+              </span>
               <button
                 className={u.manual ? 'mine' : ''}
                 onClick={(e) => {

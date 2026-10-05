@@ -327,3 +327,13 @@ code {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+.leash {
+  font-weight: 400;
+  font-size: 12px;
+  color: #e0b34a;
+}
+
+.leash.bad {
+  color: #ff7a7a;
+}

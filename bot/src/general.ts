@@ -4,7 +4,7 @@ import type { Cell } from './hex.ts';
 import { bytesFor } from './plans/types.ts';
 import type { Ctx, Memo, Task } from './plans/types.ts';
 
-export type GoalKind = 'jam' | 'ram' | 'build';
+export type GoalKind = 'jam' | 'ram' | 'build' | 'take';
 
 export interface Goal {
   id: number;
@@ -155,6 +155,14 @@ function goalTasks(ctx: Ctx): Task[] {
       note(g, 't' + w.t + ': глушити ' + where + ' - готово або неможливо');
       continue;
     }
+    if (x.kind === 'take' && owner === v.slot) {
+      note(g, 't' + w.t + ': голку ' + where + ' захоплено');
+      continue;
+    }
+    if (x.kind === 'take' && x.cell && v.starts.some((s) => s.cell.q === x.cell?.q && s.cell.r === x.cell.r)) {
+      note(g, 't' + w.t + ': голка ' + where + ' під щитом, захопити не можна');
+      continue;
+    }
     if (x.kind === 'build' && owner === v.slot) {
       note(g, 't' + w.t + ': голка ' + where + ' стоїть');
       continue;
@@ -171,7 +179,7 @@ function goalTasks(ctx: Ctx): Task[] {
     if (!to) continue;
     let u = x.unit ? alive.get(x.unit) : undefined;
     if (!u) {
-      const cls = x.kind === 'build' ? 'ткач' : 'клинок';
+      const cls = x.kind === 'build' || x.kind === 'take' ? 'ткач' : 'клинок';
       u = w.units.filter((m) => m.cls === cls && !taken.has(m.id)).sort((a, b) => dist(a, to) - dist(b, to) || a.id.localeCompare(b.id))[0];
       x.unit = u ? u.id : null;
       if (u) taken.add(u.id);
@@ -182,6 +190,7 @@ function goalTasks(ctx: Ctx): Task[] {
       if (dist(u, x.cell) <= 1 && !holding) out.push(goalTask(ctx, u, 'general:jam', { kind: 'jam', unit: u.id, target: x.cell, hold: true }, x.cell, x.id));
       else if (dist(u, x.cell) > 1 && free(u)) out.push(goalTask(ctx, u, 'general:jam', { kind: 'move', unit: u.id, q: x.cell.q, r: x.cell.r, goal: null, home: false }, x.cell, x.id));
     } else if (x.kind === 'ram' && foe && x.target && u.task?.ram !== x.target) out.push(goalTask(ctx, u, 'general:ram', { kind: 'ram', unit: u.id, target: x.target }, to, x.id));
+    else if (x.kind === 'take' && x.cell && free(u) && !(u.q === x.cell.q && u.r === x.cell.r)) out.push(goalTask(ctx, u, 'general:take', { kind: 'move', unit: u.id, q: x.cell.q, r: x.cell.r, goal: { q: x.cell.q, r: x.cell.r }, home: false }, x.cell, x.id));
     else if (x.kind === 'build' && x.cell && free(u)) out.push(goalTask(ctx, u, 'general:build', { kind: 'needle', unit: u.id, q: x.cell.q, r: x.cell.r }, x.cell, x.id));
   }
   g.goals = keep;

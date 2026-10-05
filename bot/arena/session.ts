@@ -57,6 +57,7 @@ export class Session {
       seats: { A: v.seats.A, B: v.seats.B, C: v.seats.C },
       ring: v.ring,
       starts: v.starts.map((s) => s.cell),
+      dawnAt: v.dawnAt,
     };
   }
 

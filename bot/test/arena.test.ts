@@ -95,3 +95,13 @@ test('records save under a safe name inside the arena folder only', async () => 
   assert.throws(() => saveRecord(dir, '{"v":2}'), /bad arena record/);
   assert.throws(() => saveRecord(dir, 'not json'), /bad arena record/);
 });
+
+test('frames carry how long each unit has been out of link range and whether it froze', () => {
+  const s = new Session({ seed: 100, slot: 'A', rivals: ['рівний', 'рівний'], preset: 'глушій' });
+  let f = s.step();
+  for (let i = 0; i < 60 && f && f.units.length === 0; i++) f = s.step();
+  const u = f?.units[0];
+  assert.ok(u);
+  assert.equal(typeof u.away, 'number');
+  assert.equal(typeof u.stuck, 'boolean');
+});

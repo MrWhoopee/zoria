@@ -7,7 +7,7 @@ const frame = {
   own: { '5,-8': 'A', '6,6': 'B', '0,0': 'K', '7,-13': 'A' },
   foe: [['T-A3', 'A', 'ткач', 7, 2]],
 } as unknown as ArenaFrame;
-const map = { slot: 'B', cells: [[2, 2, 'water', 0], [3, 3, 'mount', 0], [1, 1, 'meadow', 0], [7, 2, 'bare', 0]], seats: { A: { q: 6, r: -12 }, B: { q: 6, r: 6 }, C: { q: -12, r: 6 } }, ring: [], starts: [{ q: 7, r: -13 }] } as unknown as ArenaMap;
+const map = { slot: 'B', cells: [[2, 2, 'water', 0], [3, 3, 'mount', 0], [1, 1, 'meadow', 0], [7, 2, 'bare', 0]], seats: { A: { q: 6, r: -12 }, B: { q: 6, r: 6 }, C: { q: -12, r: 6 } }, ring: [], starts: [{ q: 7, r: -13 }], dawnAt: 1000 } as unknown as ArenaMap;
 const kl: ArenaUnit = { id: 'K-B7', cls: 'клинок', q: 5, r: -7, manual: true, goal: null, task: 'idle' };
 const tk: ArenaUnit = { id: 'T-B1', cls: 'ткач', q: 6, r: 6, manual: false, goal: null, task: 'idle' };
 const labels = (xs: { label: string }[]) => xs.map((x) => x.label);
@@ -23,12 +23,12 @@ test('a selected Klinok can move, jam a foe needle, ram a foe unit, halt and go 
 
 test('a selected bot Tkach can be taken and can build on an empty cell only', () => {
   assert.deepEqual(labels(menuItems(frame, map, { q: 1, r: 1 }, tk)), ['Перехопити', 'Рух', 'Будувати', 'Стоп', 'Додому']);
-  assert.deepEqual(labels(menuItems(frame, map, { q: 5, r: -8 }, tk)), ['Перехопити', 'Рух', 'Стоп', 'Додому']);
+  assert.deepEqual(labels(menuItems(frame, map, { q: 5, r: -8 }, tk)), ['Перехопити', 'Рух', 'Захопити', 'Стоп', 'Додому']);
   assert.deepEqual(menuItems(frame, map, { q: 1, r: 1 }, tk)[0]?.command, { kind: 'take', unit: 'T-B1' });
 });
 
 test('with nothing selected the menu gives the bot goals for the cell', () => {
-  assert.deepEqual(menuItems(frame, map, { q: 5, r: -8 }, null).map((x) => x.command), [{ kind: 'goal', goal: 'jam', cell: { q: 5, r: -8 } }]);
+  assert.deepEqual(menuItems(frame, map, { q: 5, r: -8 }, null).map((x) => x.command), [{ kind: 'goal', goal: 'take', cell: { q: 5, r: -8 } }, { kind: 'goal', goal: 'jam', cell: { q: 5, r: -8 } }]);
   assert.deepEqual(menuItems(frame, map, { q: 7, r: 2 }, null).map((x) => x.command), [{ kind: 'goal', goal: 'ram', target: 'T-A3' }, { kind: 'goal', goal: 'build', cell: { q: 7, r: 2 } }]);
   assert.deepEqual(menuItems(frame, map, { q: 6, r: 6 }, null), []);
   assert.deepEqual(menuItems(frame, map, { q: 0, r: 0 }, null), []);
@@ -42,4 +42,21 @@ test('shielded start needles are never offered for jamming', () => {
 test('build is never offered on water or mountains', () => {
   assert.deepEqual(menuItems(frame, map, { q: 2, r: 2 }, null), []);
   assert.deepEqual(labels(menuItems(frame, map, { q: 3, r: 3 }, tk)), ['Перехопити', 'Рух', 'Стоп', 'Додому']);
+});
+
+test('a Tkach can take a foe needle or a ruin, the bot can be ordered to take one', () => {
+  const withRuin = { ...frame, own: { ...frame.own, '1,1': null } } as unknown as ArenaFrame;
+  const take = menuItems(withRuin, map, { q: 5, r: -8 }, tk).find((x) => x.label === 'Захопити');
+  assert.deepEqual(take?.command, { kind: 'order', order: { kind: 'move', unit: 'T-B1', q: 5, r: -8, goal: { q: 5, r: -8 }, home: false } });
+  assert.ok(menuItems(withRuin, map, { q: 1, r: 1 }, tk).some((x) => x.label === 'Захопити'));
+  assert.ok(!menuItems(withRuin, map, { q: 6, r: 6 }, tk).some((x) => x.label === 'Захопити'));
+  assert.ok(!menuItems(withRuin, map, { q: 7, r: -13 }, tk).some((x) => x.label === 'Захопити'));
+  assert.ok(!menuItems(withRuin, map, { q: 5, r: -8 }, kl).some((x) => x.label === 'Захопити'));
+  assert.ok(menuItems(withRuin, map, { q: 5, r: -8 }, null).some((x) => x.command.kind === 'goal' && x.command.goal === 'take'));
+});
+
+test('Keeper needles can be taken only after dawn', () => {
+  assert.ok(!menuItems(frame, map, { q: 0, r: 0 }, tk).some((x) => x.label === 'Захопити'));
+  const late = { ...frame, t: 1001 } as unknown as ArenaFrame;
+  assert.ok(menuItems(late, map, { q: 0, r: 0 }, tk).some((x) => x.label === 'Захопити'));
 });

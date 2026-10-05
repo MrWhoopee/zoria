@@ -10,6 +10,7 @@ export interface ArenaMap {
   seats: Record<SlotName, Cell>;
   ring: Cell[];
   starts: Cell[];
+  dawnAt: number;
 }
 
 export interface ArenaUnit {
@@ -20,6 +21,8 @@ export interface ArenaUnit {
   manual: boolean;
   goal: number | null;
   task: string;
+  away: number;
+  stuck: boolean;
 }
 
 export interface ArenaGoal {
@@ -87,7 +90,7 @@ export function frameOf(slot: SlotName, w: World, obs: Observe, g: General, d: D
     own,
     dark,
     foe: obs.foe.map((f) => [f.id, f.p, f.cls, f.q, f.r]),
-    units: w.units.map((u) => ({ id: u.id, cls: u.cls, q: u.q, r: u.r, manual: g.manual.has(u.id), goal: goalOf.get(u.id) ?? null, task: taskOf(u) })),
+    units: w.units.map((u) => ({ id: u.id, cls: u.cls, q: u.q, r: u.r, manual: g.manual.has(u.id), goal: goalOf.get(u.id) ?? null, task: taskOf(u), away: u.away, stuck: u.stuck })),
     goals: g.goals.map((x) => ({ id: x.id, kind: x.kind, cell: x.cell, target: x.target, unit: x.unit })),
     yardNext: g.yardNext,
     notes: [...g.notes],
