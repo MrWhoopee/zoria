@@ -4,6 +4,7 @@ import type { Order } from '@zoria/protocol';
 import { dist, keyOf } from '../src/hex.ts';
 import { expand, reconnectValue, release, sites, unlockValue } from '../src/plans/expand.ts';
 import { presetOf } from '../src/preset.ts';
+import { pullOf } from '../src/map/coverage.ts';
 import { ctxOf } from './ctx.ts';
 import { makeObs, tkach } from './obs.ts';
 
@@ -322,4 +323,19 @@ test('with wary a Tkach at work leaves when a foe Klinok comes within two cells'
   flee?.commit(ctx.memo, 200);
   assert.equal(ctx.memo.res.get('T-B6')?.kind, 'home');
   assert.ok((ctx.memo.banned.get(keyOf(cell)) ?? 0) > 200);
+});
+
+test('with compact a Tkach takes foe needles at the border but not deep inside the foe zone', () => {
+  const v = ctxOf('B', makeObs()).v;
+  const own = v.ruins.map((c) => ({ q: c.q, r: c.r, owner: 'A' as const, dark: false }));
+  const base = { t: 200, pulse: { ...makeObs().pulse, energy: 10 }, own, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6), tkach('T-B7', 6, 7), tkach('T-B8', 7, 6)] } };
+  const probe = ctxOf('B', makeObs(base));
+  const mine = pullOf(probe.v, probe.w.ownLit().map((c) => ({ cell: c, mult: 1 })));
+  const theirs = pullOf(probe.v, probe.w.foeLit());
+  const depth = (k: string): number => (theirs.get(k) ?? 0) - (mine.get(k) ?? 0);
+  const open = expand(probe).map((t) => target(t.order));
+  assert.ok(open.some((k) => depth(k) > 1), 'the open choice goes deep');
+  const tight = expand(ctxOf('B', makeObs(base), 2026, presetOf('основний+compact=1'))).map((t) => target(t.order));
+  for (const k of tight) assert.ok(depth(k) <= 1, 'deep target ' + k);
+  assert.deepEqual(expand(ctxOf('B', makeObs(base), 2026, presetOf('основний+compact=99'))).map((t) => target(t.order)), open);
 });

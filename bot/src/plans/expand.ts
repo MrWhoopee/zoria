@@ -333,6 +333,7 @@ export function expand(ctx: Ctx): Task[] {
       if (travel === undefined) continue;
       if (ahead && s.kind === 'build' && w.energy - committed + regen * travel < need) continue;
       if (wary && hunters.some((f) => dist(f, s.cell) <= WARY_SITE)) continue;
+      if (ctx.preset.compact > 0 && (foe.get(k) ?? 0) - (own.get(k) ?? 0) > ctx.preset.compact) continue;
       const eta = travel + s.work;
       const score = (s.gain * rate * Math.max(0, left - eta) + contractExtra(ctx, s.cell, eta)) / Math.pow(eta + 1, ctx.preset.etaPower);
       if (score > bestScore) {
