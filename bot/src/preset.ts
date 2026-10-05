@@ -41,6 +41,7 @@ export const PRESETS: Record<string, Preset> = {
   скупий: { ...BASE, name: 'скупий', tkachTarget: 2, buildReserve: 60 },
   варта: { ...BASE, name: 'варта', tkachTarget: 2, klinokTarget: 4 },
   глушій: { ...BASE, name: 'глушій', tkachTarget: 2, klinokTarget: 4, jam: 1, jamHome: 0, jamLeader: 3 },
+  'глушій-2': { ...BASE, name: 'глушій-2', tkachTarget: 2, klinokTarget: 4, jam: 1, jamHome: 0, jamLeader: 3, guardFirst: 2, wary: 1 },
 };
 
 type Knob = Exclude<keyof Preset, 'name'>;
