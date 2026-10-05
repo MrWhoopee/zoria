@@ -120,3 +120,10 @@ test('the general can pick the next yard class once', () => {
   fullCtx.memo.general.yardNext = 'клинок';
   assert.deepEqual(yard(fullCtx), []);
 });
+
+test('guardFirst=2 builds the first Klinok with a single Tkach, guardFirst=1 waits for two', () => {
+  const one = [tkach('T-B1', 6, 6)];
+  assert.deepEqual(yard(ctxOf('B', swarm(200, one), 2026, presetOf('глушій')))[0]?.order, { kind: 'yard', cls: 'ткач' });
+  assert.deepEqual(yard(ctxOf('B', swarm(200, one), 2026, presetOf('глушій+guardFirst=2')))[0]?.order, { kind: 'yard', cls: 'клинок' });
+  assert.deepEqual(yard(ctxOf('B', swarm(200, []), 2026, presetOf('глушій+guardFirst=2')))[0]?.order, { kind: 'yard', cls: 'ткач' });
+});

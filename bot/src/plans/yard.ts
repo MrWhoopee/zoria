@@ -14,7 +14,7 @@ export function yard(ctx: Ctx): Task[] {
   const swapped = preset.swap > 0 && w.energy >= preset.swap;
   const tkTarget = swapped ? preset.tkachTarget + 1 : preset.tkachTarget;
   const klTarget = swapped ? Math.max(0, preset.klinokTarget - 2) : preset.klinokTarget;
-  const guardFirst = preset.guardFirst > 0 && kl === 0 && klTarget > 0 && tk >= Math.min(2, tkTarget);
+  const guardFirst = preset.guardFirst > 0 && kl === 0 && klTarget > 0 && tk >= Math.min(preset.guardFirst >= 2 ? 1 : 2, tkTarget);
   const auto: ClsName | null = guardFirst ? 'клинок' : tk < tkTarget ? 'ткач' : kl < klTarget ? 'клинок' : null;
   const cls: ClsName | null = memo.general.yardNext ?? auto;
   if (cls === null) return [];
