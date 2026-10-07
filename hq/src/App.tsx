@@ -71,6 +71,7 @@ export function App() {
   const [preset, setPreset] = useState(PRESETS[0] ?? '');
   const [big, setBig] = useState(false);
   const opened = useRef(new Set<string>());
+  const liveOn = useRef(false);
   const readySent = useRef(false);
 
   const set = (patch: Partial<View>): void => setView((v) => ({ ...v, ...patch }));
@@ -81,8 +82,32 @@ export function App() {
     const t = new TruthClient();
     truth.current = t;
     t.onAnswer = (a) => setAnswer(a);
+    t.onLive = (tick, score) => setView((v) => (v.live ? { ...v, tick, live: { ...v.live, score } } : v));
+    const toBytes = (x: unknown): Uint8Array => (x instanceof Uint8Array ? x : x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x as number[]));
+    const startLive = (h: Host): void => {
+      const L = h.live();
+      if (!L) return;
+      t.send({ kind: 'live-start', manifest: toBytes(L.manifest), bots: L.bots, roster: L.roster, ticks: L.ticks, seat: L.seat });
+      setView((v) => ({ ...v, pack: null, tick: 0, focus: L.roster[L.seat] ?? '', live: { cap: 0, state: 'live', shares: null, score: null } }));
+      liveOn.current = true;
+    };
     void connect('Оперативна').then((h) => {
       host.current = h;
+      h.on('live', () => startLive(h));
+      h.on('tick', (m) => {
+        if (!liveOn.current) return;
+        const submits = ((m['submits'] as [string, unknown][]) ?? []).map(([slot, frame]) => [slot, toBytes(frame)] as [string, Uint8Array]);
+        const denies = (m['denies'] as [string, number, number][]) ?? [];
+        t.send({ kind: 'live-tick', t: Number(m['t']), submits, denies });
+        const cap = Number(m['cap'] ?? m['t']);
+        setView((v) => (v.live ? { ...v, live: { ...v.live, cap } } : v));
+      });
+      h.on('end', (m) => {
+        const shares = (m['shares'] as number[]) ?? [];
+        t.send({ kind: 'live-end', shares });
+        setView((v) => (v.live ? { ...v, live: { ...v.live, state: 'end', shares, cap: Number(m['t'] ?? v.live.cap) } } : v));
+      });
+      if (h.mode === 'live') startLive(h);
       const list = h.packs();
       setPacks(list);
       if (h.mode === 'record' && list.length > 0) {
@@ -135,6 +160,12 @@ export function App() {
   const truthAt = answer && answer.key === keyOf(view.pack, view.match, view.tick) ? answer.at : null;
   const pair = data['preset-a'] && data['preset-b'] ? { a: data['preset-a'], b: data['preset-b'] } : null;
   const v = useMemo(() => derive(view, cur, truthAt, pair), [view, cur, truthAt, pair]);
+
+  useEffect(() => {
+    if (!view.live) return;
+    const id = requestAnimationFrame(() => host.current?.ready(view.tick));
+    return () => cancelAnimationFrame(id);
+  }, [view.live, view.tick]);
 
   useEffect(() => {
     if (readySent.current || !cur) return;

@@ -1,14 +1,17 @@
 import { Truth } from './truth.ts';
 import type { TruthAt } from './truth.ts';
+import { LiveFollower } from './live.ts';
+import type { LiveStartMsg, LiveTickMsg } from './live.ts';
 
-export type ToTruth = { kind: 'open'; match: number; bytes: ArrayBuffer } | { kind: 'at'; match: number; t: number; id: number };
+export type ToTruth = { kind: 'open'; match: number; bytes: ArrayBuffer } | { kind: 'at'; match: number; t: number; id: number } | ({ kind: 'live-start' } & LiveStartMsg) | ({ kind: 'live-tick' } & LiveTickMsg) | { kind: 'live-end'; shares: number[] };
 
-export type FromTruth = { kind: 'opened'; match: number; ticks: number } | { kind: 'truth'; match: number; id: number; at: TruthAt } | { kind: 'missing'; match: number; id: number } | { kind: 'failed'; match: number; why: string };
+export type FromTruth = { kind: 'opened'; match: number; ticks: number } | { kind: 'truth'; match: number; id: number; at: TruthAt } | { kind: 'missing'; match: number; id: number } | { kind: 'failed'; match: number; why: string } | { kind: 'live'; t: number; score: number | null };
 
 export class TruthQueue {
   private readonly matches = new Map<number, Truth>();
   private readonly waiting = new Map<number, { t: number; id: number }>();
   private scheduled = false;
+  private readonly live = new LiveFollower();
   private readonly send: (m: FromTruth) => void;
   private readonly later: (fn: () => void) => void;
 
@@ -18,6 +21,19 @@ export class TruthQueue {
   }
 
   handle(m: ToTruth): void {
+    if (m.kind === 'live-start') {
+      this.live.start(m);
+      return;
+    }
+    if (m.kind === 'live-tick') {
+      const at = this.live.tick(m);
+      this.send({ kind: 'live', t: at.t, score: at.score });
+      return;
+    }
+    if (m.kind === 'live-end') {
+      this.live.end(m.shares);
+      return;
+    }
     if (m.kind === 'open') {
       try {
         const truth = new Truth(new Uint8Array(m.bytes));

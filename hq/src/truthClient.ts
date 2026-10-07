@@ -13,11 +13,16 @@ export class TruthClient {
   private readonly wanted = new Map<number, string>();
   private readonly ids = new Map<string, number>();
   onAnswer: (a: TruthAnswer) => void = () => undefined;
+  onLive: (t: number, score: number | null) => void = () => undefined;
 
   constructor() {
     this.worker = new TruthWorker();
     this.worker.onmessage = (e: MessageEvent<FromTruth>) => {
       const m = e.data;
+      if (m.kind === 'live') {
+        this.onLive(m.t, m.score);
+        return;
+      }
       if (m.kind !== 'truth') return;
       const key = this.wanted.get(m.id);
       this.wanted.delete(m.id);
@@ -29,6 +34,10 @@ export class TruthClient {
     const copy = bytes.slice().buffer;
     const msg: ToTruth = { kind: 'open', match: slot, bytes: copy };
     this.worker.postMessage(msg, [copy]);
+  }
+
+  send(msg: ToTruth): void {
+    this.worker.postMessage(msg);
   }
 
   ask(slot: number, t: number, key: string): void {
