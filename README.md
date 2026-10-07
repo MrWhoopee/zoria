@@ -127,7 +127,7 @@ npm run league -- --players "глушій-2" --pool "рівний,обхідни
 
 ## Submission stack
 
-`compose.yaml` in the root is the stack the organizers build from the commit: `head` runs the bot on the wire, `control-plane` serves `/health`, `/metrics`, `/belief-stream`, `/presets` and `/presets/promote` on port 7801. Steps to install, build and check it:
+`compose.yaml` in the root is the stack the organizers build from the commit: `head` runs the bot on the wire, `control-plane` serves `/health`, `/metrics`, `/belief-stream`, `/presets` and `/presets/promote` on port 7801, `hq` serves the operations room on port 8080 (published on 8180). Steps to install, build and check it:
 
 ```bash
 cd bot && npm ci && cd ..        # bot dependencies, lockfile required
@@ -137,6 +137,21 @@ docker compose up --build         # the stack by hand; set ZARIA_URL and ZARIA_T
 ```
 
 `preflight` scans the whole working tree, ignored files included: keep notes and scratch files with credential-like text outside the repository while it runs.
+
+## HQ
+
+The operations room lives in `hq/` (its `package.json` declares `zaria.hq`): a React page built by Vite into one self-contained `hq/dist/index.html`, with the engine in an inlined worker. It reads records and the live broadcast only through the host bridge, never the network.
+
+```bash
+cd hq
+npm ci
+npm test                 # model tests against records/reference
+npm run build            # hq/dist/index.html
+cd ..
+CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe" npx zaria-kit hq-check --hq hq/dist --seed 1
+```
+
+`hq-check` runs the twenty tasks, the frame comparison with the reference display and the console check, and writes `hq-report.json`. Set `CHROME` to the browser path when Chrome is not on `PATH`.
 
 ## Push protection
 
