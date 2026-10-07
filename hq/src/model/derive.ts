@@ -72,6 +72,16 @@ export function slotOf(v: View, data: PackData): string {
   return (m ? slotOfNick(m.roster, focusNick(v, data)) : null) ?? focusSlot(data.summary, v.match);
 }
 
+const comparisons = new WeakMap<PackData, ReturnType<typeof compare>>();
+
+function comparisonOf(pair: { a: PackData; b: PackData }): ReturnType<typeof compare> {
+  const hit = comparisons.get(pair.a);
+  if (hit) return hit;
+  const c = compare(pair.a.summary, pair.b.summary, [pair.a.id, pair.b.id]);
+  comparisons.set(pair.a, c);
+  return c;
+}
+
 export function focusNick(v: View, data: PackData | null): string {
   return v.focus || data?.summary.belief?.nick || '';
 }
@@ -91,7 +101,7 @@ export function derive(v: View, data: PackData | null, truth: TruthAt | null, pa
   const ok = truth !== null && truth.t === v.tick;
   for (const k of ['cell-owner-truth', 'cell-owner-belief', 'ghost-cell', 'ghost-age', 'diff-count', 'dark-count', 'score', 'needles', 'shares', 'bytes', 'orders', 'denied', 'deny-word', 'deny-top-tick', 'ab-winner', 'ab-diff', 'ab-top']) out[k] = '';
   if (pair) {
-    const c = compare(pair.a.summary, pair.b.summary, [pair.a.id, pair.b.id]);
+    const c = comparisonOf(pair);
     out['ab-winner'] = c.winner;
     out['ab-diff'] = c.diff(v.match);
     out['ab-top'] = c.top(v.match);

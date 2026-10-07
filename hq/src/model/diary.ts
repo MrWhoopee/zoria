@@ -44,6 +44,22 @@ export class Diary {
 
   at(t: number): Belief {
     if (t === this.cacheT) return this.cache;
+    if (t > this.cacheT && this.cacheT >= 0 && !this.fulls.some((i) => {
+      const l = this.lines[i];
+      return !!l && l.t > this.cacheT && l.t <= t;
+    })) {
+      const own = new Map(this.cache.own);
+      const dark = new Map(this.cache.dark);
+      for (const l of this.lines) {
+        if (l.t <= this.cacheT) continue;
+        if (l.t > t) break;
+        for (const [k, v] of Object.entries(l.own ?? {})) own.set(k, v);
+        for (const [k, v] of Object.entries(l.dark ?? {})) dark.set(k, v);
+      }
+      this.cacheT = t;
+      this.cache = { own, dark };
+      return this.cache;
+    }
     let start = -1;
     for (const i of this.fulls) {
       const l = this.lines[i];

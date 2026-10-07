@@ -56,3 +56,4 @@ body { font-family: 'Consolas', 'Courier New', monospace; color: #9fe0a2; }
 .lever.s503 .a b { color: #ff3b2e; }
 .lever .a { color: #e9e1c9; }
 .drawer button.on { border-color: #ffb02e; color: #ffd27a; }
+.dev { contain: strict; }

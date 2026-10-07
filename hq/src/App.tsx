@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import room from './assets/room.webp';
 import { parseCell } from './anchors.ts';
@@ -12,31 +12,37 @@ import type { Mode, PackData, View } from './model/derive.ts';
 import type { TruthAt } from './model/truth.ts';
 import { TruthClient } from './truthClient.ts';
 import { MapScreen } from './view/MapScreen.tsx';
+import type { MapProps } from './view/MapScreen.tsx';
 
-type Values = Record<string, string>;
 const PRESETS = ['глушій-2', 'глушій', 'варта', 'основний', 'рівний', 'обхідник'];
 const MODES: Mode[] = ['truth', 'belief', 'both'];
 
+const STYLES = Object.fromEntries((Object.keys(DEVICES) as Device[]).map((d) => [d, place(DEVICES[d])])) as Record<Device, ReturnType<typeof place>>;
+
 function Dev({ at, children, className }: { at: Device; children?: ReactNode; className?: string }) {
   return (
-    <div className={'dev ' + at + (className ? ' ' + className : '')} style={place(DEVICES[at])}>
+    <div className={'dev ' + at + (className ? ' ' + className : '')} style={STYLES[at]}>
       {children}
     </div>
   );
 }
 
-function A({ name, v, label }: { name: string; v: Values; label?: string }) {
+const A = memo(function A({ name, v, label }: { name: string; v: string | undefined; label?: string }) {
   return (
     <span className="a">
       {label ? <i>{label}</i> : null}
-      <b data-zaria={name}>{v[name] ?? ''}</b>
+      <b data-zaria={name}>{v ?? ''}</b>
     </span>
   );
-}
+});
 
 function Field({ name, value, placeholder, commit }: { name: string; value: string; placeholder: string; commit: (s: string) => void }) {
   const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value);
+    setText(value);
+  }
   return (
     <input
       data-zaria={name}
@@ -53,12 +59,55 @@ function Field({ name, value, placeholder, commit }: { name: string; value: stri
   );
 }
 
-function Meter({ value, max }: { value: number; max: number }) {
+const Meter = memo(function Meter({ value, max }: { value: number; max: number }) {
   const angle = -48 + 96 * Math.min(1, Math.max(0, value / max));
   return <div className="needle" style={{ transform: 'rotate(' + angle + 'deg)' }} />;
-}
+});
 
 const keyOf = (pack: string | null, match: number, t: number): string => pack + ':' + match + ':' + t;
+
+type Answer = { key: string; at: TruthAt } | null;
+let answer: Answer = null;
+const listeners = new Set<() => void>();
+const answers = {
+  set(a: Answer): void {
+    answer = a;
+    for (const f of listeners) f();
+  },
+  subscribe(f: () => void): () => void {
+    listeners.add(f);
+    return () => listeners.delete(f);
+  },
+  get: (): Answer => answer,
+};
+
+type Pair = { a: PackData; b: PackData } | null;
+let last: { view: View; cur: PackData | null; at: TruthAt | null; pair: Pair; out: Record<string, string> } | null = null;
+function derived(view: View, cur: PackData | null, at: TruthAt | null, pair: Pair): Record<string, string> {
+  if (last && last.view === view && last.cur === cur && last.at === at && last.pair === pair) return last.out;
+  const out = derive(view, cur, at, pair);
+  last = { view, cur, at, pair, out };
+  return out;
+}
+
+function useTruth(view: View): TruthAt | null {
+  const a = useSyncExternalStore(answers.subscribe, answers.get);
+  return a && a.key === keyOf(view.pack, view.match, view.tick) ? a.at : null;
+}
+
+const TA = memo(function TA({ name, label, view, cur, pair }: { name: string; label?: string; view: View; cur: PackData | null; pair: Pair }) {
+  const at = useTruth(view);
+  return <A name={name} v={derived(view, cur, at, pair)[name]} label={label} />;
+});
+
+const LiveMap = memo(function LiveMap(props: Omit<MapProps, 'truth'> & { view: View }) {
+  const at = useTruth(props.view);
+  const shown = useRef<TruthAt | null>(null);
+  if (at) shown.current = at;
+  const { view: _, ...rest } = props;
+  return <MapScreen {...rest} truth={shown.current?.owners ?? null} />;
+});
+const m0 = (d: PackData | null, match: number) => d?.matches[match - 1] ?? null;
 
 export function App() {
   const host = useRef<Host | null>(null);
@@ -66,7 +115,6 @@ export function App() {
   const [packs, setPacks] = useState<PackEntry[]>([]);
   const [data, setData] = useState<Record<string, PackData>>({});
   const [view, setView] = useState<View>(initial());
-  const [answer, setAnswer] = useState<{ key: string; at: TruthAt } | null>(null);
   const [playing, setPlaying] = useState(false);
   const [preset, setPreset] = useState(PRESETS[0] ?? '');
   const [big, setBig] = useState(false);
@@ -74,14 +122,14 @@ export function App() {
   const liveOn = useRef(false);
   const readySent = useRef(false);
 
-  const set = (patch: Partial<View>): void => setView((v) => ({ ...v, ...patch }));
+  const set = (patch: Partial<View>): void => setView((v) => ((Object.keys(patch) as (keyof View)[]).every((k) => v[k] === patch[k]) ? v : { ...v, ...patch }));
   const cur = view.pack ? data[view.pack] ?? null : null;
   const slotNo = (pack: string, match: number): number => (Object.keys(data).indexOf(pack) + 1) * 10 + match;
 
   useEffect(() => {
     const t = new TruthClient();
     truth.current = t;
-    t.onAnswer = (a) => setAnswer(a);
+    t.onAnswer = (a) => answers.set(a);
     t.onLive = (tick, score) => setView((v) => (v.live ? { ...v, tick, live: { ...v.live, score } } : v));
     const toBytes = (x: unknown): Uint8Array => (x instanceof Uint8Array ? x : x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x as number[]));
     const startLive = (h: Host): void => {
@@ -157,9 +205,12 @@ export function App() {
     return () => cancelAnimationFrame(id);
   }, [playing, cur]);
 
-  const truthAt = answer && answer.key === keyOf(view.pack, view.match, view.tick) ? answer.at : null;
-  const pair = data['preset-a'] && data['preset-b'] ? { a: data['preset-a'], b: data['preset-b'] } : null;
-  const v = useMemo(() => derive(view, cur, truthAt, pair), [view, cur, truthAt, pair]);
+  const sparkSlot = cur ? slotOf(view, cur) : '';
+  const spark = useMemo(() => (m0(cur, view.match) && cur ? channelOf(m0(cur, view.match)!, sparkSlot).series.map((p) => p.t + ',' + (40 - Math.min(40, p.bytes / 8))).join(' ') : ''), [cur, view.match, sparkSlot]);
+  const pa = data['preset-a'];
+  const pb = data['preset-b'];
+  const pair = useMemo(() => (pa && pb ? { a: pa, b: pb } : null), [pa, pb]);
+  const v = useMemo(() => derive(view, cur, null, pair), [view, cur, pair]);
 
   useEffect(() => {
     if (!view.live) return;
@@ -208,45 +259,45 @@ export function App() {
       <div className={'room' + (playing ? ' playing' : '')}>
         <img className="photo" src={room} alt="" draggable={false} />
         <Dev at="board">
-          <span className="flap"><A name="match" v={v} label="ПАРТІЯ" /> <span className="a"><i>ТАКТ</i><b>{String(view.tick).padStart(4, '0')}</b></span></span>
-          <span className="flap"><A name="focus" v={v} /> <A name="score" v={v} /></span>
+          <span className="flap"><A name="match" v={v['match']} label="ПАРТІЯ" /> <span className="a"><i>ТАКТ</i><b>{String(view.tick).padStart(4, '0')}</b></span></span>
+          <span className="flap"><A name="focus" v={v['focus']} /> <TA name="score" view={view} cur={cur} pair={pair} /></span>
         </Dev>
         <Dev at="onAir" className={view.live ? 'lit' : ''}>
           <span className="sign">{view.live ? (view.live.state === 'end' ? 'КІНЕЦЬ' : 'В ЕФІРІ') : 'ЗАПИС'}</span>
-          <A name="live-state" v={v} />
+          <A name="live-state" v={v['live-state']} />
         </Dev>
-        <Dev at="vu1"><Meter value={Number(v['bytes'] || 0)} max={320} /><A name="bytes" v={v} label="байти" /></Dev>
-        <Dev at="vu2"><Meter value={Number(v['orders'] || 0)} max={10} /><A name="orders" v={v} label="команди" /></Dev>
-        <Dev at="vu3"><Meter value={Number(v['denied'] || 0)} max={4} /><A name="denied" v={v} label="відмови" /></Dev>
+        <Dev at="vu1"><Meter value={Number(v['bytes'] || 0)} max={320} /><A name="bytes" v={v['bytes']} label="байти" /></Dev>
+        <Dev at="vu2"><Meter value={Number(v['orders'] || 0)} max={10} /><A name="orders" v={v['orders']} label="команди" /></Dev>
+        <Dev at="vu3"><Meter value={Number(v['denied'] || 0)} max={4} /><A name="denied" v={v['denied']} label="відмови" /></Dev>
         <Dev at="wall">
-          <A name="shares" v={v} label="частки" />
-          <A name="needles" v={v} label="голки горять" />
+          <A name="shares" v={v['shares']} label="частки" />
+          <TA name="needles" view={view} cur={cur} pair={pair} label="голки горять" />
         </Dev>
         <Dev at="left" className="mon">
           <span className="title">РОЗВІДКА</span>
-          <A name="mode" v={v} label="шар" />
-          <A name="cell" v={v} label="сота" />
-          <A name="cell-owner-truth" v={v} label="правда" />
-          <A name="cell-owner-belief" v={v} label="віра" />
-          <A name="ghost-cell" v={v} label={'примара ' + (view.unit || '')} />
-          <A name="ghost-age" v={v} label="вік" />
-          <A name="diff-count" v={v} label="розбіжність" />
-          <A name="dark-count" v={v} label="мовчать" />
+          <A name="mode" v={v['mode']} label="шар" />
+          <A name="cell" v={v['cell']} label="сота" />
+          <TA name="cell-owner-truth" view={view} cur={cur} pair={pair} label="правда" />
+          <A name="cell-owner-belief" v={v['cell-owner-belief']} label="віра" />
+          <A name="ghost-cell" v={v['ghost-cell']} label={'примара ' + (view.unit || '')} />
+          <A name="ghost-age" v={v['ghost-age']} label="вік" />
+          <TA name="diff-count" view={view} cur={cur} pair={pair} label="розбіжність" />
+          <A name="dark-count" v={v['dark-count']} label="мовчать" />
         </Dev>
         <Dev at="round" className={'screen' + (big ? ' big' : '')}>
           <div className="scope" onClick={() => !big && setBig(true)}>
-            <MapScreen needles={m?.needles ?? []} truth={truthAt?.owners ?? null} belief={belief} mode={view.mode} cell={view.cell} ghost={v['ghost-cell'] ?? ''} big={big} onPick={(c) => set({ cell: c })} />
+            <LiveMap view={view} needles={m?.needles ?? []} belief={belief} mode={view.mode} cell={view.cell} ghost={v['ghost-cell'] ?? ''} big={big} onPick={(c) => set({ cell: c })} />
           </div>
           {big ? <button className="close" onClick={() => setBig(false)}>×</button> : null}
         </Dev>
         <Dev at="right" className="mon">
           <span className="title">КАНАЛ</span>
           <svg className="spark" viewBox="0 0 1200 40" preserveAspectRatio="none">
-            <polyline fill="none" stroke="currentColor" strokeWidth="6" points={(m && cur ? channelOf(m, slotOf(view, cur)).series : []).map((p) => p.t + ',' + (40 - Math.min(40, p.bytes / 8))).join(' ')} />
+            <polyline fill="none" stroke="currentColor" strokeWidth="6" points={spark} />
             <line x1={view.tick} x2={view.tick} y1="0" y2="40" stroke="#ffffff" strokeWidth="4" />
           </svg>
-          <A name="deny-word" v={v} label={'відмова #' + view.order} />
-          <A name="deny-top-tick" v={v} label="найгірший такт" />
+          <A name="deny-word" v={v['deny-word']} label={'відмова #' + view.order} />
+          <A name="deny-top-tick" v={v['deny-top-tick']} label="найгірший такт" />
         </Dev>
         <Dev at="reels" className="reels">
           <span className="reel l" />
@@ -257,11 +308,11 @@ export function App() {
             <input type="range" min={0} max={m?.ticks ?? 1200} value={view.tick} onChange={(e) => goTick(e.target.value)} />
           </div>
         </Dev>
-        <Dev at="nixie"><A name="tick" v={v} /></Dev>
+        <Dev at="nixie"><A name="tick" v={v['tick']} /></Dev>
         <Dev at="lamps">
           <span className={'lamp ' + status} />
           <span className={'lamp ' + (view.live ? 'red' : 'off')} />
-          <A name="live-lag" v={v} label="відстав." />
+          <A name="live-lag" v={v['live-lag']} label="відстав." />
         </Dev>
         <Dev at="keypad" className="keys">
           <Field name="go-tick" value={String(view.tick)} placeholder="такт" commit={goTick} />
@@ -273,9 +324,9 @@ export function App() {
         <Dev at="knob2"><select data-zaria="go-mode" value={view.mode} onChange={(e) => set({ mode: e.target.value as Mode })}>{MODES.map((x) => <option key={x} value={x}>{x}</option>)}</select></Dev>
         <Dev at="knob3"><select data-zaria="go-focus" value={nick} onChange={(e) => set({ focus: e.target.value })}>{(roster.length ? roster : [nick]).map((n) => <option key={n} value={n}>{n}</option>)}</select></Dev>
         <Dev at="cassettes">
-          <A name="ab-winner" v={v} label="краще" />
-          <A name="ab-diff" v={v} label="різниця" />
-          <A name="ab-top" v={v} label="стаття" />
+          <A name="ab-winner" v={v['ab-winner']} label="краще" />
+          <A name="ab-diff" v={v['ab-diff']} label="різниця" />
+          <A name="ab-top" v={v['ab-top']} label="стаття" />
         </Dev>
         <Dev at="drawer" className="drawer">
           {packs.map((p) => (
@@ -289,7 +340,7 @@ export function App() {
             {PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
           <button data-zaria="do-promote" onClick={promote}>в бій</button>
-          <A name="promote-status" v={v} label="відповідь" />
+          <A name="promote-status" v={v['promote-status']} label="відповідь" />
         </Dev>
       </div>
     </div>
