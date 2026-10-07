@@ -13,7 +13,7 @@ export interface TruthAt {
 
 interface Inside {
   SIM: { world: { own: Record<string, string | null>; needles: Record<string, number> } };
-  simScore(p: string): number;
+  simScoreBreakdown(p: string): { total: number };
 }
 
 const SLOTS = ['A', 'B', 'C'];
@@ -36,7 +36,7 @@ export class Truth {
     const score: Record<string, number> = {};
     const needles: Record<string, number> = {};
     for (const s of SLOTS) {
-      score[s] = E.simScore(s);
+      score[s] = E.simScoreBreakdown(s).total;
       needles[s] = E.SIM.world.needles[s] ?? 0;
     }
     return { t: this.cursor.t(), owners: { ...E.SIM.world.own }, score, needles };
