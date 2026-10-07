@@ -1,0 +1,10 @@
+# контекст збірки - корінь репозиторію; кожен Dockerfile копіює лише
+# своє. Зайве в контексті - зайві секунди на кожну збірку
+.git
+**/node_modules
+**/dist
+records
+*.log
+preflight.json
+hq-report.json
+.zaria-preflight

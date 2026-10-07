@@ -1,0 +1,105 @@
+# Стек здачі: те, що ми зберемо з вашого коміта і піднімемо на вашій
+# машині (частина 4, 02-build.md). Один файл у корені репозиторію; include
+# і extends заборонені.
+#
+# Ролі конвеєр читає мітками, а не іменами сервісів:
+#   zaria.role: head   голова на проводі - їй вузол кладе ZARIA_URL і ZARIA_TOKEN
+#   zaria.control      службові ручки: /health, /metrics (kit/02-control-plane.md)
+#   zaria.hq           штаб: віддає зібрану сторінку
+#   zaria.belief       абсолютний шлях щоденника віри всередині контейнера
+#
+# Мережі: wire - вихідне до вузла; plane - лише голова і службові ручки
+# (internal: true, назовні не виходить); front - те, що ви відкриваєте самі.
+# Опубліковані порти - для вас: у заліку машина їх не публікує.
+
+services:
+  head:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+      args:
+        # секрет реєстру кладемо ми, і лише в збірку: в образ він не
+        # потрапляє, в репозиторії його немає зовсім (02-build.md, 6.5)
+        ZORIA_NPM_AUTH: ${ZORIA_NPM_AUTH:-}
+    labels:
+      zaria.role: head
+      zaria.belief: /data/belief.ndjson
+    environment:
+      ZARIA_URL: ${ZARIA_URL:-}
+      ZARIA_TOKEN: ${ZARIA_TOKEN:-}
+      ZARIA_ENGINE: ${ZARIA_ENGINE:-}
+      ZARIA_FREEZE: ${ZARIA_FREEZE:-}
+      ZARIA_PRESET: ${ZARIA_PRESET:-глушій-2}
+      ZARIA_BELIEF: /data/belief.ndjson
+      STATUS_PORT: '7811'
+      STATUS_HOST: 0.0.0.0
+    volumes:
+      - diaries:/data
+    networks:
+      - wire
+      - plane
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    # голова не перезапускається: resume-печатка живе в пам'яті процесу, і
+    # свіжий процес вузол закриє кодом 4006 (kit/04-protocol-pins.md)
+    restart: 'no'
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+    labels:
+      zaria.control: '7801'
+    environment:
+      PORT: '7801'
+      HOST: 0.0.0.0
+      HEAD_URL: http://head:7811
+      ZARIA_BELIEF: /data/belief.ndjson
+    volumes:
+      - type: volume
+        source: diaries
+        target: /data
+        read_only: true
+    networks:
+      - plane
+      - front
+    ports:
+      - '${ZARIA_BIND:-127.0.0.1}:${ZARIA_CONTROL_PORT:-7801}:7801'
+    depends_on:
+      head:
+        condition: service_started
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  wire: {}
+  plane:
+    internal: true
+  front: {}
+
+volumes:
+  diaries: {}

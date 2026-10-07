@@ -5,3 +5,7 @@ docs/
 .superpowers/
 dist/
 assets-src/
+records/
+preflight.json
+hq-report.json
+.zaria-preflight/
