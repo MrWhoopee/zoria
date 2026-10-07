@@ -5,7 +5,7 @@ registers the participant at the moment the window opens.
 
 ## Requirements
 
-Node.js 22.18 or newer. The agent itself has no dependencies; React and Vite are needed only to build the client.
+Node.js 22.18 or newer for the agent and the client; Node.js 24 for the bot and the submission stack. The agent itself has no dependencies; React and Vite are needed only to build the client. The stack needs Docker with compose v2. Packages `@zoria/*` come from the contest registry: `.npmrc` refers to the `ZORIA_NPM_AUTH` environment variable and never holds the secret itself.
 
 ## Running the agent
 
@@ -112,3 +112,47 @@ npm test
 All tests run without the network: the reference frames and the learning
 key are published in the client spec, and a local stand-in server is used
 in place of the real one.
+
+## The bot
+
+The bot lives in `bot/` (its `package.json` declares `zaria.bot`). The live default preset is `глушій-2`; `ZARIA_PRESET` picks another named preset.
+
+```bash
+cd bot
+npm ci
+npm test                # unit tests, no network, well under 10 minutes
+npm run build           # TypeScript to dist/
+npm run league -- --players "глушій-2" --pool "рівний,обхідник" --seeds 4 --workers 6
+```
+
+## Submission stack
+
+`compose.yaml` in the root is the stack the organizers build from the commit: `head` runs the bot on the wire, `control-plane` serves `/health`, `/metrics`, `/belief-stream`, `/presets` and `/presets/promote` on port 7801. Steps to install, build and check it:
+
+```bash
+cd bot && npm ci && cd ..        # bot dependencies, lockfile required
+npm ci                            # root, puts zaria-kit in reach of npx
+npx zaria-kit preflight           # the same eleven stages as the organizers run
+docker compose up --build         # the stack by hand; set ZARIA_URL and ZARIA_TOKEN for a match
+```
+
+`preflight` scans the whole working tree, ignored files included: keep notes and scratch files with credential-like text outside the repository while it runs.
+
+## Push protection
+
+A local `pre-push` hook scans every commit being pushed for private keys, GitHub, npm, AWS and Slack tokens, a registry secret written into `.npmrc`, and passwords assigned as strings outside test paths, and blocks the push on a finding. Enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The scanner is `scripts/secret-scan.ts`; its tests are in `test/scripts/`.
+
+## Arena
+
+A local battle screen where you play one slot as a general over the bot: take a unit, give the bot goals, pick the next yard class, with fog of war. It is not part of the submission.
+
+```bash
+npm run arena            # http://localhost:5174/
+npm run arena:review     # replay the last battle with and without your commands
+```
