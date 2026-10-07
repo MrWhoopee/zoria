@@ -1,0 +1,36 @@
+{
+  "name": "zaria-hq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Штаб Зорі: оперативна кімната",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "check": "npm run build && zaria-kit hq-check"
+  },
+  "zaria": {
+    "hq": "dist",
+    "lang": "uk"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@zoria/kit": "^1.1.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vite-plugin-singlefile": "^2.3.3"
+  },
+  "dependencies": {
+    "@zoria/engine": "^1.1.3",
+    "@zoria/protocol": "^1.1.3",
+    "@zoria/sdk": "^1.1.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

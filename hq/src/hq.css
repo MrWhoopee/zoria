@@ -1,0 +1,22 @@
+html, body, #root { margin: 0; height: 100%; background: #0b0d0c; overflow: hidden; }
+body { font-family: 'Consolas', 'Courier New', monospace; color: #9fe0a2; }
+.stage { height: 100%; display: flex; align-items: center; justify-content: center; }
+.room { position: relative; width: min(100vw, 160vh); aspect-ratio: 1312 / 816; container-type: inline-size; }
+.photo { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; }
+.dev { position: absolute; box-sizing: border-box; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 0.2cqw 0.6cqw; font-size: 0.85cqw; line-height: 1.15; overflow: hidden; }
+.a { display: inline-flex; gap: 0.3cqw; white-space: nowrap; }
+.a i { font-style: normal; opacity: 0.6; }
+.a b { font-weight: 600; }
+.mon { padding: 0.4cqw 0.6cqw; flex-direction: column; text-shadow: 0 0 0.3cqw rgba(120, 255, 140, 0.5); }
+.board { color: #ece6d6; font-size: 1.1cqw; padding: 0.5cqw; justify-content: space-between; }
+.onAir { align-items: center; justify-content: center; font-size: 1.2cqw; color: #ffd9d0; }
+.nixie { align-items: center; justify-content: center; font-size: 2.6cqw; color: #ffab4a; text-shadow: 0 0 0.6cqw rgba(255, 140, 40, 0.8); letter-spacing: 0.9cqw; }
+.vu1, .vu2, .vu3 { align-items: flex-end; justify-content: center; color: #1b1b18; font-size: 0.75cqw; }
+.wall { color: #d8d2bf; flex-direction: column; padding: 0.4cqw; }
+.cassettes, .lamps { color: #e9e1c9; font-size: 0.75cqw; align-items: center; }
+.keys, .lever, .drawer { flex-direction: column; flex-wrap: nowrap; }
+.keys input, .lever select, .dev select { font: inherit; font-size: 0.8cqw; background: rgba(10, 18, 12, 0.85); color: #b9f5bb; border: 1px solid #3c5a40; border-radius: 0.2cqw; padding: 0.1cqw 0.3cqw; width: 100%; box-sizing: border-box; }
+.knob1 select, .knob2 select, .knob3 select { opacity: 0.85; margin-top: 30%; }
+.drawer button, .lever button { font: inherit; font-size: 0.8cqw; background: rgba(30, 30, 26, 0.85); color: #e7dfc6; border: 1px solid #6b6650; cursor: pointer; }
+.lever button { background: rgba(120, 20, 16, 0.85); color: #fff; }
+.screen { border-radius: 50%; }
