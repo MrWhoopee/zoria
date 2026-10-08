@@ -77,7 +77,7 @@ body { font-family: 'Courier New', ui-monospace, monospace; color: #9dff9f; }
 .cassettes { align-items: center; justify-content: space-around; flex-wrap: nowrap; color: #2a261d; font: 700 0.58cqw/1 'Arial', sans-serif; }
 .cassettes .a { flex-direction: column; align-items: center; gap: 0.1cqw; background: #e3d9bb; padding: 0.15cqw 0.35cqw; border-radius: 0.08cqw; box-shadow: 0 0.06cqw 0.2cqw rgba(0, 0, 0, 0.6); }
 
-.drawer { flex-direction: column; flex-wrap: nowrap; gap: 0.12cqw; }
+.drawer { flex-direction: column; flex-wrap: nowrap; gap: 0.12cqw; overflow-y: auto; scrollbar-width: thin; }
 .drawer button { font: 700 0.58cqw/1 'Arial', sans-serif; text-align: left; padding: 0.2cqw 0.35cqw; background: #d8cfb2; color: #2a261d; border: none; border-radius: 0.2cqw 0.2cqw 0 0; box-shadow: 0 0.06cqw 0.15cqw rgba(0, 0, 0, 0.6); cursor: pointer; }
 .drawer button.on { background: #f6e7b0; box-shadow: 0 0 0.5cqw rgba(255, 190, 80, 0.7); }
 

@@ -34,7 +34,8 @@ for (const d of ours) {
   const pack = rec.pack;
   if (!pack.belief) pack.belief = { seat: 0, nick: pack.roster?.[0] ?? '', files: [1, 2, 3].map((n) => 'belief-' + n + '.ndjson') };
   const seed = d.split('-')[1] ?? d;
-  all.push({ id: 'ours-' + seed, title: 'наш бот, жереб ' + seed, preset: 'глушій-2', dir, rec });
+  const rivals = (pack.roster ?? []).slice(1).join('+');
+  all.push({ id: 'ours-' + (all.length - 2), title: rivals + ' · ' + seed, preset: 'глушій-2', dir, rec });
 }
 
 const config = () =>
