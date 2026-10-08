@@ -110,11 +110,13 @@ const Names = memo(function Names({ roster }: { roster: string[] }) {
 const Note = memo(function Note() {
   return (
     <Spot b={NOTE} className="note">
+      <div className="paper">
+        <span>▲ ткач</span>
+        <span>◆ клинок</span>
+        <span>■ Ключник</span>
+        <span className="red">✕ глушіння</span>
+      </div>
       <i className="tape" />
-      <span>▲ ткач</span>
-      <span>◆ клинок</span>
-      <span>■ Ключник</span>
-      <span className="red">✕ глушіння</span>
     </Spot>
   );
 });
