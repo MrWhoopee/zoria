@@ -20,6 +20,7 @@ import { Desk } from './view/desk.ts';
 const PRESETS = ['глушій-3', 'глушій-2', 'глушій', 'варта', 'основний', 'рівний', 'обхідник'];
 const MODES: Mode[] = ['truth', 'belief', 'both'];
 const PLAY_RATE = 30;
+const PROMOTE_NAME: Record<string, string> = { '': 'вибери пресет і тисни', '-': 'вибери пресет і тисни', '…': 'чекаю відповідь бота', '200': 'бот прийняв пресет', '409': 'відмова: іде прогін або заморожено', '503': 'бот не відповідає', '400': 'бот не знає такого пресета', err: 'господар не відповів' };
 const MODE_NAME: Record<Mode, string> = { truth: 'правда', belief: 'віра', both: 'обидва' };
 const METERS: [string, number][] = [['bytes', 320], ['orders', 10], ['denied', 4]];
 const VALUE_ANCHORS = new Set(['match', 'tick', 'focus', 'score', 'needles', 'shares']);
@@ -56,6 +57,7 @@ function Field({ name, value, placeholder, commit }: { name: string; value: stri
       data-zaria={name}
       value={text}
       placeholder={placeholder}
+      title={placeholder}
       onChange={(e) => {
         setText(e.target.value);
         commit(e.target.value);
@@ -112,13 +114,13 @@ const Knobs = memo(function Knobs({ match, mode, nick, roster, live, act }: { ma
   return (
     <>
       <Spot b={KNOBS.knob1} className={'knob k' + (match - 1)}>
-        <select data-zaria="go-match" value={match} onChange={(e) => act.goMatch(e.target.value)}>{[1, 2, 3].map((n) => <option key={n} value={n}>{'партія ' + n}</option>)}</select>
+        <select data-zaria="go-match" value={match} onChange={(e) => { act.goMatch(e.target.value); e.currentTarget.blur(); }}>{[1, 2, 3].map((n) => <option key={n} value={n}>{'партія ' + n}</option>)}</select>
       </Spot>
       <Spot b={KNOBS.knob2} className={'knob k' + MODES.indexOf(mode)}>
-        <select data-zaria="go-mode" value={mode} onChange={(e) => act.set({ mode: e.target.value as Mode })}>{MODES.map((x) => <option key={x} value={x}>{MODE_NAME[x]}</option>)}</select>
+        <select data-zaria="go-mode" value={mode} onChange={(e) => { act.set({ mode: e.target.value as Mode }); e.currentTarget.blur(); }}>{MODES.map((x) => <option key={x} value={x}>{MODE_NAME[x]}</option>)}</select>
       </Spot>
       <Spot b={KNOBS.knob3} className={'knob k' + Math.max(0, roster.indexOf(nick))}>
-        <select data-zaria="go-focus" value={nick} onChange={(e) => act.set({ focus: e.target.value })}>{(roster.length ? roster : [nick]).map((n) => <option key={n} value={n}>{n}</option>)}</select>
+        <select data-zaria="go-focus" value={nick} onChange={(e) => { act.set({ focus: e.target.value }); e.currentTarget.blur(); }}>{(roster.length ? roster : [nick]).map((n) => <option key={n} value={n}>{n}</option>)}</select>
       </Spot>
       <Spot b={PLATES.knob1} className="plate"><i>ПАРТІЯ</i><b>{live ? 'ефір' : match}</b></Spot>
       <Spot b={PLATES.knob2} className="plate"><i>ШАР</i><b>{MODE_NAME[mode]}</b></Spot>
@@ -131,8 +133,8 @@ const Drawer = memo(function Drawer({ packs, pack, act }: { packs: PackEntry[]; 
   return (
     <Dev at="drawer" className="drawer">
       {packs.map((p) => (
-        <button key={p.id} className={p.id === pack ? 'on' : ''} data-zaria="go-pack" data-zaria-value={p.id} onClick={() => act.set({ pack: p.id })}>
-          {p.id}
+        <button key={p.id} className={p.id === pack ? 'on' : ''} data-zaria="go-pack" data-zaria-value={p.id} title={p.title} onClick={() => act.set({ pack: p.id })}>
+          {p.title || p.id}
         </button>
       ))}
     </Dev>
@@ -142,11 +144,12 @@ const Drawer = memo(function Drawer({ packs, pack, act }: { packs: PackEntry[]; 
 const Lever = memo(function Lever({ preset, status, act, reg }: { preset: string; status: string; act: Act; reg: Reg }) {
   return (
     <Dev at="lever" className={'lever s' + status}>
-      <select data-zaria="go-preset" value={preset} onChange={(e) => act.setPreset(e.target.value)}>
+      <select data-zaria="go-preset" value={preset} title="пресет для живого бота" onChange={(e) => { act.setPreset(e.target.value); e.currentTarget.blur(); }}>
         {PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
       </select>
-      <button data-zaria="do-promote" onClick={act.promote}>в бій</button>
+      <button data-zaria="do-promote" title="попросити живого бота грати цим пресетом з наступної партії" onClick={act.promote}>в бій</button>
       <A name="promote-status" label="відповідь" reg={reg} />
+      <span className="said">{PROMOTE_NAME[status] ?? 'відповідь ' + status}</span>
     </Dev>
   );
 });
@@ -304,6 +307,10 @@ export function App() {
     paintRef.current();
   };
 
+  const setTickRef = useRef(setTick);
+  setTickRef.current = setTick;
+  const toggleRef = useRef(() => {});
+
   useLayoutEffect(() => paint());
 
   useEffect(() => {
@@ -408,7 +415,7 @@ export function App() {
       }
       if (e.code === 'Space' && !typing && !viewRef.current.live) {
         e.preventDefault();
-        setPlaying((p) => !p);
+        toggleRef.current();
       }
     };
     window.addEventListener('keydown', key);
@@ -466,13 +473,24 @@ export function App() {
   const promote = (): void => {
     const h = host.current;
     if (!h) return;
-    void h.promote(preset).then((r) => set({ promote: String(r.status) }));
+    set({ promote: '…' });
+    void h.promote(preset).then(
+      (r) => set({ promote: String(r.status) }),
+      () => set({ promote: 'err' }),
+    );
   };
 
   const acts = useRef({ set, goMatch, goTick, promote, setPreset });
   acts.current = { set, goMatch, goTick, promote, setPreset };
   const act = useMemo<Act>(() => ({ set: (p) => acts.current.set(p), goMatch: (x) => acts.current.goMatch(x), goTick: (x) => acts.current.goTick(x), promote: () => acts.current.promote(), setPreset: (x) => acts.current.setPreset(x) }), []);
-  const toggle = useMemo(() => () => setPlaying((p) => !p), []);
+  const toggle = useMemo(
+    () => () => {
+      if (!st.current.playing && tickRef.current >= (st.current.m?.ticks ?? 1200)) setTickRef.current(0);
+      setPlaying(!st.current.playing);
+    },
+    [],
+  );
+  toggleRef.current = toggle;
   const reg = desk.reg;
 
   return (
@@ -529,7 +547,7 @@ export function App() {
           <Spot key={i} b={b} className={'lamp l' + i} at={desk.part('lamp' + i)} />
         ))}
         <Dev at="keypad" className="keys">
-          <input data-zaria="go-tick" ref={desk.part('goTick')} defaultValue="0" placeholder="такт" onChange={(e) => goTick(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && goTick(e.currentTarget.value)} />
+          <input data-zaria="go-tick" title="такт: число і Enter" ref={desk.part('goTick')} defaultValue="0" placeholder="такт" onChange={(e) => goTick(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && goTick(e.currentTarget.value)} />
           <Field name="go-cell" value={view.cell} placeholder="сота q,r" commit={goCell} />
           <Field name="go-unit" value={view.unit} placeholder="машина" commit={(s) => set({ unit: s.trim() })} />
           <Field name="go-order" value={String(view.order)} placeholder="команда" commit={goOrder} />

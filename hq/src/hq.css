@@ -78,7 +78,7 @@ body { font-family: 'Courier New', ui-monospace, monospace; color: #9dff9f; }
 .cassettes .a { flex-direction: column; align-items: center; gap: 0.1cqw; background: #e3d9bb; padding: 0.15cqw 0.35cqw; border-radius: 0.08cqw; box-shadow: 0 0.06cqw 0.2cqw rgba(0, 0, 0, 0.6); }
 
 .drawer { flex-direction: column; flex-wrap: nowrap; gap: 0.12cqw; overflow-y: auto; scrollbar-width: thin; }
-.drawer button { font: 700 0.58cqw/1 'Arial', sans-serif; text-align: left; padding: 0.2cqw 0.35cqw; background: #d8cfb2; color: #2a261d; border: none; border-radius: 0.2cqw 0.2cqw 0 0; box-shadow: 0 0.06cqw 0.15cqw rgba(0, 0, 0, 0.6); cursor: pointer; }
+.drawer button { font: 700 0.5cqw/1.15 'Arial', sans-serif; text-align: left; white-space: normal; overflow-wrap: anywhere; flex: none; padding: 0.2cqw 0.35cqw; background: #d8cfb2; color: #2a261d; border: none; border-radius: 0.2cqw 0.2cqw 0 0; box-shadow: 0 0.06cqw 0.15cqw rgba(0, 0, 0, 0.6); cursor: pointer; }
 .drawer button.on { background: #f6e7b0; box-shadow: 0 0 0.5cqw rgba(255, 190, 80, 0.7); }
 
 .lever { flex-direction: column; flex-wrap: nowrap; gap: 0.2cqw; padding: 0.3cqw; }
@@ -88,6 +88,10 @@ body { font-family: 'Courier New', ui-monospace, monospace; color: #9dff9f; }
 .lever.s200 .a b { color: #4dff6a; }
 .lever.s409 .a b { color: #ffb02e; }
 .lever.s503 .a b { color: #ff3b2e; }
+.lever .said { color: #e9e1c9; font: 700 0.5cqw/1.2 'Arial', sans-serif; text-shadow: 0 0.05cqw 0.1cqw #000; }
+.lever.s200 .said { color: #7dff8f; }
+.lever.s409 .said, .lever.s400 .said { color: #ffb02e; }
+.lever.s503 .said { color: #ff6a5c; }
 .flaps, .tubes { contain: strict; }
 .board { position: absolute; display: block; pointer-events: none; }
 .flapKey { position: absolute; color: transparent; font-size: 0.5cqw; overflow: hidden; contain: strict; user-select: none; }

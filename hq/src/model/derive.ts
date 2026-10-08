@@ -94,7 +94,7 @@ export function derive(v: View, data: PackData | null, truth: TruthAt | null, pa
   out['mode'] = v.mode;
   out['focus'] = nick;
   out['cell'] = v.cell;
-  out['promote-status'] = v.promote || '-';
+  out['promote-status'] = /^\d+$/.test(v.promote) ? v.promote : '-';
   out['live-lag'] = v.live ? String(Math.max(0, v.live.cap - v.tick)) : '-';
   out['live-state'] = v.live ? v.live.state : '-';
   const m = data?.matches[v.match - 1];
