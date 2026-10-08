@@ -13,6 +13,7 @@
     "build:client": "vite build",
     "arena": "vite --config vite.arena.config.ts",
     "arena:review": "cd bot && node tools/arena-review.ts",
+    "hq": "cd hq && npm run build && node tools/view.mjs",
     "encode:photo": "node scripts/encode-photo.ts"
   },
   "dependencies": {

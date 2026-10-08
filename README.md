@@ -147,7 +147,7 @@ cd hq
 npm ci
 npm test                 # model tests against records/reference
 npm run build            # hq/dist/index.html
-npm run view             # the room with the records in a browser, the link is printed
+npm run view             # the room with the records in a browser, the link is printed (npm run hq from the root builds and opens it)
 cd ..
 CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe" npx zaria-kit hq-check --hq hq/dist --seed 1
 ```
