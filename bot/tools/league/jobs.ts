@@ -26,8 +26,9 @@ export function trios(players: string[], pool: string[]): Trio[] {
   return out.sort((x, y) => x.join('|').localeCompare(y.join('|')));
 }
 
-export function jobs(ts: Trio[], seeds: number[]): Job[] {
-  return ts.flatMap((cast) => seeds.map((seed) => ({ seed, cast })));
+export function jobs(ts: Trio[], seeds: number[], fair = false): Job[] {
+  const casts = fair ? ts.flatMap((t): Trio[] => [t, [t[2], t[1], t[0]]]) : ts;
+  return casts.flatMap((cast) => seeds.map((seed) => ({ seed, cast })));
 }
 
 export function pending(all: Job[], done: { seed: number; cast: Trio }[]): Job[] {

@@ -19,6 +19,7 @@ const { values } = parseArgs({
     ticks: { type: 'string', default: '1200' },
     resume: { type: 'string', default: '' },
     workers: { type: 'string', default: String(Math.max(1, Math.floor(cpus().length / 2) - 2)) },
+    fair: { type: 'boolean', default: false },
   },
 });
 
@@ -29,7 +30,7 @@ for (const n of [...players, ...pool]) kindOf(n);
 const seeds = Array.from({ length: Number(values.seeds) }, (_, i) => Number(values.from) + i);
 const ticks = Number(values.ticks);
 const earlier: PackRecord[] = values.resume && existsSync(values.resume) ? readRecords(readFileSync(values.resume, 'utf8')) : [];
-const todo: Job[] = pending(jobs(trios(players, pool), seeds), earlier);
+const todo: Job[] = pending(jobs(trios(players, pool), seeds, values.fair), earlier);
 for (const [name, raw] of [['seeds', values.seeds], ['from', values.from], ['ticks', values.ticks], ['workers', values.workers]] as const) {
   if (!Number.isInteger(Number(raw)) || Number(raw) < 0) throw new Error('--' + name + ' must be a whole number, got ' + raw);
 }

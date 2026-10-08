@@ -29,6 +29,7 @@ test('trios keep at least one player, sorted and without duplicates', () => {
   assert.equal(trios(['p', 'q'], ['a', 'b', 'c']).length, 9);
   assert.equal(trios(['p', 'a'], ['a', 'b']).length, 1);
   assert.deepEqual(jobs([['a', 'b', 'p']], [100, 101]).map((j) => j.seed), [100, 101]);
+  assert.deepEqual(jobs([['a', 'b', 'p']], [100], true).map((j) => j.cast), [['a', 'b', 'p'], ['p', 'b', 'a']]);
 });
 
 const zero: Breakdown = { network: 0, orders: 0, stolen: 0, jams: 0, rams: 0, pactTax: 0 };
