@@ -154,6 +154,8 @@ CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe" npx zaria-kit hq-
 
 `hq-check` runs the twenty tasks, the frame comparison with the reference display and the console check, and writes `hq-report.json`. Set `CHROME` to the browser path when Chrome is not on `PATH`.
 
+Sound is off when the page opens: the ♪ switch on the on-air panel or the `M` key turns it on. The show frame has no storage, so the choice is not remembered between openings.
+
 ## Push protection
 
 A local `pre-push` hook scans every commit being pushed for private keys, GitHub, npm, AWS and Slack tokens, a registry secret written into `.npmrc`, and passwords assigned as strings outside test paths, and blocks the push on a finding. Enable it once per clone:
