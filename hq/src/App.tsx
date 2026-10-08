@@ -17,7 +17,7 @@ import { Board, BoardPainter, Spot, Tubes } from './view/Devices.tsx';
 import type { Reg } from './view/Devices.tsx';
 import { Desk } from './view/desk.ts';
 
-const PRESETS = ['глушій-2', 'глушій', 'варта', 'основний', 'рівний', 'обхідник'];
+const PRESETS = ['глушій-3', 'глушій-2', 'глушій', 'варта', 'основний', 'рівний', 'обхідник'];
 const MODES: Mode[] = ['truth', 'belief', 'both'];
 const PLAY_RATE = 30;
 const MODE_NAME: Record<Mode, string> = { truth: 'правда', belief: 'віра', both: 'обидва' };

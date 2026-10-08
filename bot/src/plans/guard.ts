@@ -1,7 +1,9 @@
 import type { MineUnit } from '@zoria/protocol';
-import { dist, keyOf } from '../hex.ts';
+import { dist, keyOf, neighbors } from '../hex.ts';
 import type { Cell } from '../hex.ts';
-import { cfg } from '../map/valley.ts';
+import { cutLoss } from '../map/cut.ts';
+import { stepTicks } from '../map/travel.ts';
+import { cfg, inside } from '../map/valley.ts';
 import { bytesFor, midStep } from './types.ts';
 import type { Ctx, Task } from './types.ts';
 
@@ -25,6 +27,26 @@ function postCell(ctx: Ctx): Cell | null {
       best = c;
     }
   }
+  return best;
+}
+
+let cutMemo: { key: string; post: Cell | null } = { key: '', post: null };
+
+function cutPost(ctx: Ctx): Cell | null {
+  const lit = ctx.w.ownLit();
+  const key = ctx.v.slot + ':' + lit.map((c) => keyOf(c)).sort().join(';');
+  if (cutMemo.key === key) return cutMemo.post;
+  const loss = cutLoss(ctx.v.base, lit, (a, b) => ctx.links.ok(a, b));
+  let best: Cell | null = null;
+  let bestN = 1;
+  for (const c of lit) {
+    const n = loss.get(keyOf(c)) ?? 0;
+    if (n > bestN || (n === bestN && best !== null && keyOf(c) < keyOf(best))) {
+      bestN = n;
+      best = c;
+    }
+  }
+  cutMemo = { key, post: best };
   return best;
 }
 
@@ -91,7 +113,23 @@ export function guard(ctx: Ctx): Task[] {
       if (dist(k, f) > 1) tasks.push(task(ctx, k, 'guard:shadow', { kind: 'move', unit: k.id, q: f.q, r: f.r, goal: null, home: false }, SHADOW_VALUE - dist(k, f)));
     }
   }
-  const post = escort ? ringPost(ctx) : postCell(ctx);
+  if (preset.aside > 0) {
+    const taken = new Set([...w.units.map((u) => keyOf(u)), ...w.foe.map((f) => keyOf(f))]);
+    const blocked = w.units.filter((u) => u.cls === 'ткач' && u.wait > 0 && (u.task?.path ?? 0) > 0).sort(byId);
+    for (const t of blocked) {
+      for (const k of klinoks) {
+        if (used.has(k.id) || k.task !== null || dist(k, t) !== 1) continue;
+        const cell = neighbors(k)
+          .filter((c) => inside(v, c) && !taken.has(keyOf(c)) && dist(c, t) >= 2 && stepTicks(v, k, c, 'клинок') !== null)
+          .sort((a, b) => keyOf(a).localeCompare(keyOf(b)))[0];
+        if (!cell) continue;
+        used.add(k.id);
+        taken.add(keyOf(cell));
+        tasks.push(task(ctx, k, 'guard:aside', { kind: 'move', unit: k.id, q: cell.q, r: cell.r, goal: null, home: false }, GUARD_VALUE / 2));
+      }
+    }
+  }
+  const post = escort ? ringPost(ctx) : (preset.postCut > 0 ? cutPost(ctx) : null) ?? postCell(ctx);
   if (!post) return tasks;
   for (const k of klinoks) {
     if (used.has(k.id) || k.task !== null || dist(k, post) <= POST_SLACK) continue;

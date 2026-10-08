@@ -182,3 +182,25 @@ test('shadowing never takes a jamming Klinok and is capped by the knob', () => {
   assert.equal(tasks.length, 1);
   assert.notEqual(tasks[0]?.unit, 'K-B7');
 });
+
+test('an idle Klinok next to a blocked Tkach steps aside to a free cell', () => {
+  const path = { goal: { q: 12, r: 0 }, site: { q: 12, r: 0 }, feed: null, jam: null, ram: null, home: false, path: 6 };
+  const units = [tkach('T-B9', 8, 4, { wait: 1, task: path }), klinok('K-B7', 9, 4), klinok('K-B8', 6, 6)];
+  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles: starts, units } });
+  const tasks = guard(settled(obs, presetOf('основний+aside=1')));
+  const aside = tasks.filter((t) => t.tag === 'guard:aside');
+  assert.equal(aside.length, 1);
+  const o = aside[0]?.order;
+  assert.equal(o?.kind, 'move');
+  if (o?.kind === 'move') {
+    assert.equal(Math.max(Math.abs(o.q - 8), Math.abs(o.r - 4), Math.abs(o.q + o.r - 12)), 2);
+    assert.ok(!(o.q === 6 && o.r === 6));
+  }
+});
+
+test('without the knob a blocked Tkach does not move the Klinoks', () => {
+  const path = { goal: { q: 12, r: 0 }, site: { q: 12, r: 0 }, feed: null, jam: null, ram: null, home: false, path: 6 };
+  const units = [tkach('T-B9', 8, 4, { wait: 1, task: path }), klinok('K-B7', 9, 4)];
+  const obs = makeObs({ t: 200, mine: { ...makeObs().mine, needles: starts, units } });
+  assert.ok(guard(settled(obs)).every((t) => t.tag !== 'guard:aside'));
+});
