@@ -71,6 +71,7 @@ test('preset values are pinned', () => {
   assert.deepEqual(PRESETS['глушій-2'], { ...PRESETS['глушій'], name: 'глушій-2', guardFirst: 2, wary: 1 });
   assert.deepEqual(PRESETS['глушій-3'], { ...PRESETS['глушій-2'], name: 'глушій-3', aside: 1 });
   assert.deepEqual(PRESETS['глушій-4'], { ...PRESETS['глушій-3'], name: 'глушій-4', cache: 40 });
+  assert.deepEqual(PRESETS['глушій-5'], { ...PRESETS['глушій-4'], name: 'глушій-5', harm: 0.3 });
 });
 
 test('every malformed knob is refused with its text', () => {
