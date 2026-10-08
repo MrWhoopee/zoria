@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -25,6 +25,17 @@ const all = [
   .map((p) => ({ ...p, dir: join(records, p.id) }))
   .filter((p) => existsSync(join(p.dir, 'pack.json')))
   .map((p) => ({ ...p, rec: openRecord(p.dir) }));
+
+const oursDir = join(records, 'ours');
+const ours = existsSync(oursDir) ? readdirSync(oursDir).filter((d) => existsSync(join(oursDir, d, 'pack.json'))).sort() : [];
+for (const d of ours) {
+  const dir = join(oursDir, d);
+  const rec = openRecord(dir);
+  const pack = rec.pack;
+  if (!pack.belief) pack.belief = { seat: 0, nick: pack.roster?.[0] ?? '', files: [1, 2, 3].map((n) => 'belief-' + n + '.ndjson') };
+  const seed = d.split('-')[1] ?? d;
+  all.push({ id: 'ours-' + seed, title: 'наш бот, жереб ' + seed, preset: 'глушій-2', dir, rec });
+}
 
 const config = () =>
   JSON.stringify({
