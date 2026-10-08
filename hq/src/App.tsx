@@ -5,7 +5,7 @@ import { parseCell } from './anchors.ts';
 import { loadPack } from './data.ts';
 import { connect } from './host.ts';
 import type { Host, PackEntry } from './host.ts';
-import { DECK, DEVICES, ENGRAVE, KNOBS, LAMPS, PLATES, REELS, TUBES, place } from './layout.ts';
+import { DECK, DEVICES, ENGRAVE, KNOBS, LAMPS, LEGEND, PLATES, REELS, TUBES, place } from './layout.ts';
 import type { Device } from './layout.ts';
 import { channelOf, derive, focusNick, initial, slotOf } from './model/derive.ts';
 import type { LiveView, Mode, PackData, View } from './model/derive.ts';
@@ -98,16 +98,17 @@ const Reels = memo(function Reels() {
 const Legend = memo(function Legend({ roster }: { roster: string[] }) {
   return (
     <>
-      <div className="legend">
+      <Spot b={LEGEND.players} className="legend">
         {roster.map((n, i) => (
           <span key={n} style={{ color: ['#ffb347', '#4fe3d4', '#f27be8'][i] }}>● {n}</span>
         ))}
+      </Spot>
+      <Spot b={LEGEND.units} className="legend">
         <span>▲ ткач</span>
         <span>◆ клинок</span>
         <span>■ Ключник</span>
         <span style={{ color: '#ff6a5c' }}>✕ глушіння</span>
-      </div>
-      <div className="glass" />
+      </Spot>
     </>
   );
 });
@@ -552,7 +553,7 @@ export function App() {
           <div className="scope" onClick={() => zoom <= 1 && zoomIn()}>
             <MapScreen canvas={desk.part('map', true)} zoom={Math.max(1, zoom)} onPick={(c) => set({ cell: c })} />
             <div className="sweep" />
-            <Legend roster={roster} />
+            <div className="glass" />
           </div>
           {zoom > 1 ? <button className="back" onClick={() => setCam(null)}>Esc</button> : null}
         </Dev>
@@ -565,6 +566,7 @@ export function App() {
           <A name="deny-word" label={'відмова #' + view.order} reg={reg} />
           <A name="deny-top-tick" label="найгірший такт" reg={reg} />
         </Dev>
+        <Legend roster={roster} />
         <Reels />
         <Deck playing={playing} ticks={m?.ticks ?? 1200} toggle={toggle} act={act} part={desk.part} />
         <Tubes name="needles" g={TUBES.needles} reg={reg} />

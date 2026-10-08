@@ -57,9 +57,9 @@ body { font-family: 'Courier New', ui-monospace, monospace; color: #9dff9f; }
 .map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .sweep { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: conic-gradient(from 0deg, rgba(120, 255, 140, 0.16), rgba(120, 255, 140, 0) 70deg); animation: spin 5s linear infinite; }
 .glass { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: radial-gradient(ellipse at 45% 22%, rgba(220, 255, 220, 0.12), rgba(220, 255, 220, 0) 38%), repeating-linear-gradient(rgba(0, 0, 0, 0.16) 0 0.05cqw, transparent 0.05cqw 0.14cqw); }
-.legend { position: absolute; left: 50%; top: 4%; transform: translateX(-50%); display: none; gap: 0.35cqw; font: 700 0.24cqw/1.2 'Arial', sans-serif; color: #cfeecf; white-space: nowrap; pointer-events: none; }
+.legend { display: none; flex-direction: column; justify-content: center; gap: 0.3cqw; font: 700 0.42cqw/1.2 'Arial', sans-serif; color: #cfeecf; pointer-events: none; padding: 0.3cqw; box-sizing: border-box; background: rgba(4, 16, 8, 0.82); border: 1px solid #2f4a33; border-radius: 0.3cqw; }
 .zoomed .legend { display: flex; }
-.legend span { display: inline-flex; gap: 0.08cqw; align-items: center; }
+.legend span { display: flex; gap: 0.15cqw; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .back { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); font: 700 0.32cqw/1 'Arial', sans-serif; color: #b9f5bb; background: rgba(0, 0, 0, 0.55); border: 0.03cqw solid #3c5a40; border-radius: 0.1cqw; padding: 0.06cqw 0.2cqw; cursor: pointer; }
 
 .onAir { flex-direction: column; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 0.25cqw; color: #6d5e58; font: 700 0.6cqw/1.2 'Arial', sans-serif; }

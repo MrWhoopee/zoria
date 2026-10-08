@@ -75,4 +75,5 @@ export const PLATES = { knob1: box(524, 716, 604, 728), knob2: box(649, 716, 729
 
 export const DECK = { play: box(380, 597, 400, 610), step: box(403, 597, 424, 610), slider: box(392, 615, 602, 624) };
 export const SCOPE = box(570, 316, 762, 496);
+export const LEGEND = { players: box(492, 374, 566, 430), units: box(762, 374, 836, 430) };
 export const ENGRAVE = { needles: box(700, 597, 760, 605), shares: box(785, 597, 905, 605) };
