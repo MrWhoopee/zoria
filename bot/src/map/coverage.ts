@@ -62,3 +62,20 @@ export function takeGain(v: Valley, site: Cell, own: Pull, foe: Pull, foeMult: n
   }
   return total;
 }
+
+export function feedGain(v: Valley, site: Cell, own: Pull, foe: Pull): number {
+  const reach = v.rings.length;
+  let total = 0;
+  for (const c of disc(site, reach)) {
+    if (!inside(v, c)) continue;
+    const d = dist(c, site);
+    if (d < 2) continue;
+    const fed = ringWeight(v, d - 1);
+    const was = d < reach ? ringWeight(v, d) : 0;
+    const k = keyOf(c);
+    const o = own.get(k) ?? 0;
+    const f = foe.get(k) ?? 0;
+    total += price(v, c) * (share(o + fed - was, f) - share(o, f));
+  }
+  return total;
+}

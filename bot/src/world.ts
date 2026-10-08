@@ -31,6 +31,7 @@ export class World {
   dark = new Map<string, boolean>();
   seen = new Map<string, number>();
   since = new Map<string, number>();
+  caches = new Set<string>();
   private foeAt = new Map<string, string>();
   private foeStill = new Map<string, number>();
 
@@ -39,6 +40,7 @@ export class World {
     for (const c of v.ruins) this.owner.set(keyOf(c), null);
     for (const c of v.ring) this.owner.set(keyOf(c), 'K');
     for (const s of v.starts) this.owner.set(keyOf(s.cell), s.slot);
+    for (const c of v.caches) this.caches.add(keyOf(c));
   }
 
   update(obs: Observe): void {
@@ -79,6 +81,7 @@ export class World {
     }
     for (const e of obs.events) {
       if (e.type === 'cap') this.owner.set(key(e.q, e.r), e.p);
+      if (e.type === 'find') this.caches.delete(key(e.q, e.r));
     }
     const held = new Set(obs.mine.needles.map((n) => key(n.q, n.r)));
     const lost = new Map(obs.mine.losts.map((l) => [key(l.q, l.r), l]));
