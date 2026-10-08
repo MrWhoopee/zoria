@@ -10,7 +10,8 @@
   "scripts": {
     "build": "vite build",
     "test": "node --test \"test/**/*.test.ts\"",
-    "check": "npm run build && zaria-kit hq-check"
+    "check": "npm run build && zaria-kit hq-check",
+    "view": "node tools/view.mjs"
   },
   "zaria": {
     "hq": "dist",
