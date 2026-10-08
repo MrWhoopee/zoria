@@ -26,16 +26,19 @@ const all = [
   .filter((p) => existsSync(join(p.dir, 'pack.json')))
   .map((p) => ({ ...p, rec: openRecord(p.dir) }));
 
-const oursDir = join(records, 'ours');
-const ours = existsSync(oursDir) ? readdirSync(oursDir).filter((d) => existsSync(join(oursDir, d, 'pack.json'))).sort() : [];
-for (const d of ours) {
-  const dir = join(oursDir, d);
-  const rec = openRecord(dir);
-  const pack = rec.pack;
-  if (!pack.belief) pack.belief = { seat: 0, nick: pack.roster?.[0] ?? '', files: [1, 2, 3].map((n) => 'belief-' + n + '.ndjson') };
-  const seed = d.split('-')[1] ?? d;
-  const rivals = (pack.roster ?? []).slice(1).join('+');
-  all.push({ id: 'ours-' + (all.length - 2), title: rivals + ' · ' + seed, preset: 'глушій-2', dir, rec });
+const oursDirs = readdirSync(records).filter((d) => d.startsWith('ours')).sort();
+for (const group of oursDirs) {
+  const oursDir = join(records, group);
+  const packsIn = readdirSync(oursDir).filter((d) => existsSync(join(oursDir, d, 'pack.json'))).sort();
+  for (const d of packsIn) {
+    const dir = join(oursDir, d);
+    const rec = openRecord(dir);
+    const pack = rec.pack;
+    if (!pack.belief) pack.belief = { seat: 0, nick: pack.roster?.[0] ?? '', files: [1, 2, 3].map((n) => 'belief-' + n + '.ndjson') };
+    const seed = d.split('-')[1] ?? d;
+    const rivals = (pack.roster ?? []).slice(1).join('+');
+    all.push({ id: 'ours-' + (all.length - 2), title: group + ': ' + rivals + ' · ' + seed, preset: 'глушій', dir, rec });
+  }
 }
 
 const config = () =>
