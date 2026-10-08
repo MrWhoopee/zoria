@@ -102,15 +102,3 @@ test('taking a needle where we already pull fully gains nothing for us', async (
   const full = new Map(disc(site, 3).map((c) => [keyOf(c), 1]));
   assert.equal(takeGain(v, site, full, new Map(), 1, 0), 0);
 });
-
-test('feeding pays only where the outer rings are not ours yet', async () => {
-  const { feedGain, pullOf } = await import('../src/map/coverage.ts');
-  const { valleyOf } = await import('./fixture.ts');
-  const v = valleyOf('B');
-  const site = { q: 9, r: 3 };
-  const none = new Map<string, number>();
-  const alone = feedGain(v, site, pullOf(v, [{ cell: site, mult: 1 }]), none);
-  assert.ok(alone > 0);
-  const crowd = [site, { q: 12, r: 3 }, { q: 6, r: 3 }, { q: 9, r: 6 }, { q: 9, r: 0 }, { q: 12, r: 0 }, { q: 6, r: 6 }].map((cell) => ({ cell, mult: 1 }));
-  assert.ok(feedGain(v, site, pullOf(v, crowd), none) < alone / 2);
-});

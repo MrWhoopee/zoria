@@ -1,7 +1,7 @@
 import type { ActorName, MineUnit, Order } from '@zoria/protocol';
 import { disc, dist, keyOf, parse } from '../hex.ts';
 import type { Cell } from '../hex.ts';
-import { feedGain, gain, pullOf, takeGain } from '../map/coverage.ts';
+import { gain, pullOf, takeGain } from '../map/coverage.ts';
 import type { Pull } from '../map/coverage.ts';
 import { travelField } from '../map/travel.ts';
 import { cfg, inside, price, typeAt } from '../map/valley.ts';
@@ -195,9 +195,8 @@ function taskFor(ctx: Ctx, u: MineUnit, c: Claim, value: number, since: number):
   };
 }
 
-function feedCell(ctx: Ctx, taken: Set<string>, own: Pull, foe: Pull): Cell | null {
+function feedCell(ctx: Ctx, taken: Set<string>): Cell | null {
   const { v, w, memo } = ctx;
-  const exact = ctx.preset.feedExact > 0;
   const fed = new Set([...memo.res.values()].filter((r) => r.kind === 'feed').map((r) => keyOf(r.cell)));
   let best: Cell | null = null;
   let bestValue = 0;
@@ -205,8 +204,7 @@ function feedCell(ctx: Ctx, taken: Set<string>, own: Pull, foe: Pull): Cell | nu
     const k = keyOf(c);
     if (fed.has(k) || taken.has(k)) continue;
     let value = 0;
-    if (exact) value = feedGain(v, c, own, foe);
-    else for (const x of disc(c, 4)) if (dist(x, c) >= 2) value += price(v, x);
+    for (const x of disc(c, 4)) if (dist(x, c) >= 2) value += price(v, x);
     if (value > bestValue) {
       bestValue = value;
       best = c;
@@ -350,7 +348,7 @@ export function expand(ctx: Ctx): Task[] {
       continue;
     }
     if (memo.res.has(u.id) || !ctx.preset.feed) continue;
-    const f = feedCell(ctx, taken, own, foe);
+    const f = feedCell(ctx, taken);
     if (!f) continue;
     taken.add(keyOf(f));
     tasks.push(taskFor(ctx, u, { kind: 'feed', cell: f, owner: null, work: 0 }, 0.001, -1));
