@@ -50,9 +50,10 @@ export class BoardPainter {
   private last: Record<string, string> = {};
   private px = '';
 
-  draw(cv: HTMLCanvasElement, width: number, height: number, text: BoardText): void {
+  draw(cv: HTMLCanvasElement, width: number, height: number, text: BoardText): number {
     const ctx = cv.getContext('2d');
-    if (!ctx || !width) return;
+    if (!ctx || !width) return 0;
+    let flips = 0;
     const dpr = window.devicePixelRatio || 1;
     const W = Math.round(width * dpr);
     const H = Math.round(height * dpr);
@@ -78,9 +79,11 @@ export class BoardPainter {
         const w = ((g.box.w * c.w) / 100 / b.w) * W;
         const h = ((g.box.h * c.h) / 100 / b.h) * H;
         ctx.drawImage(tile(ch, Math.round(w), Math.round(h)), Math.round(x), Math.round(y));
+        flips++;
       }
       this.last[name] = str;
     }
+    return flips;
   }
 }
 

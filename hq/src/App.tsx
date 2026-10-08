@@ -16,6 +16,7 @@ import type { MapState } from './view/MapScreen.tsx';
 import { Board, BoardPainter, Spot, Tubes } from './view/Devices.tsx';
 import type { Reg } from './view/Devices.tsx';
 import { Desk } from './view/desk.ts';
+import { Sound } from './sound/engine.ts';
 
 const PRESETS = ['глушій-3', 'глушій-2', 'глушій', 'варта', 'основний', 'рівний', 'обхідник'];
 const MODES: Mode[] = ['truth', 'belief', 'both'];
@@ -79,6 +80,7 @@ interface Act {
   goTick: (s: string) => void;
   promote: () => void;
   setPreset: (p: string) => void;
+  sfx: Sound;
 }
 
 const Reels = memo(function Reels() {
@@ -114,13 +116,13 @@ const Knobs = memo(function Knobs({ match, mode, nick, roster, live, act }: { ma
   return (
     <>
       <Spot b={KNOBS.knob1} className={'knob k' + (match - 1)}>
-        <select data-zaria="go-match" value={match} onChange={(e) => { act.goMatch(e.target.value); e.currentTarget.blur(); }}>{[1, 2, 3].map((n) => <option key={n} value={n}>{'партія ' + n}</option>)}</select>
+        <select data-zaria="go-match" value={match} onChange={(e) => { act.sfx.knob(); act.goMatch(e.target.value); e.currentTarget.blur(); }}>{[1, 2, 3].map((n) => <option key={n} value={n}>{'партія ' + n}</option>)}</select>
       </Spot>
       <Spot b={KNOBS.knob2} className={'knob k' + MODES.indexOf(mode)}>
-        <select data-zaria="go-mode" value={mode} onChange={(e) => { act.set({ mode: e.target.value as Mode }); e.currentTarget.blur(); }}>{MODES.map((x) => <option key={x} value={x}>{MODE_NAME[x]}</option>)}</select>
+        <select data-zaria="go-mode" value={mode} onChange={(e) => { act.sfx.knob(); act.set({ mode: e.target.value as Mode }); e.currentTarget.blur(); }}>{MODES.map((x) => <option key={x} value={x}>{MODE_NAME[x]}</option>)}</select>
       </Spot>
       <Spot b={KNOBS.knob3} className={'knob k' + Math.max(0, roster.indexOf(nick))}>
-        <select data-zaria="go-focus" value={nick} onChange={(e) => { act.set({ focus: e.target.value }); e.currentTarget.blur(); }}>{(roster.length ? roster : [nick]).map((n) => <option key={n} value={n}>{n}</option>)}</select>
+        <select data-zaria="go-focus" value={nick} onChange={(e) => { act.sfx.knob(); act.set({ focus: e.target.value }); e.currentTarget.blur(); }}>{(roster.length ? roster : [nick]).map((n) => <option key={n} value={n}>{n}</option>)}</select>
       </Spot>
       <Spot b={PLATES.knob1} className="plate"><i>ПАРТІЯ</i><b>{live ? 'ефір' : match}</b></Spot>
       <Spot b={PLATES.knob2} className="plate"><i>ШАР</i><b>{MODE_NAME[mode]}</b></Spot>
@@ -133,7 +135,7 @@ const Drawer = memo(function Drawer({ packs, pack, act }: { packs: PackEntry[]; 
   return (
     <Dev at="drawer" className="drawer">
       {packs.map((p) => (
-        <button key={p.id} className={p.id === pack ? 'on' : ''} data-zaria="go-pack" data-zaria-value={p.id} title={p.title} onClick={() => act.set({ pack: p.id })}>
+        <button key={p.id} className={p.id === pack ? 'on' : ''} data-zaria="go-pack" data-zaria-value={p.id} title={p.title} onClick={() => { if (p.id !== pack) act.sfx.cassette(); act.set({ pack: p.id }); }}>
           {p.title || p.id}
         </button>
       ))}
@@ -144,7 +146,7 @@ const Drawer = memo(function Drawer({ packs, pack, act }: { packs: PackEntry[]; 
 const Lever = memo(function Lever({ preset, status, act, reg }: { preset: string; status: string; act: Act; reg: Reg }) {
   return (
     <Dev at="lever" className={'lever s' + status}>
-      <select data-zaria="go-preset" value={preset} title="пресет для живого бота" onChange={(e) => { act.setPreset(e.target.value); e.currentTarget.blur(); }}>
+      <select data-zaria="go-preset" value={preset} title="пресет для живого бота" onChange={(e) => { act.sfx.knob(); act.setPreset(e.target.value); e.currentTarget.blur(); }}>
         {PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
       </select>
       <button data-zaria="do-promote" title="попросити живого бота грати цим пресетом з наступної партії" onClick={act.promote}>в бій</button>
@@ -194,6 +196,9 @@ export function App() {
   const asked = useRef('');
   const mapSeen = useRef<unknown[]>([]);
   const scoreText = useRef('');
+  const sound = useRef(new Sound()).current;
+  const [muted, setMuted] = useState(sound.muted);
+  sound.onMute = setMuted;
 
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -256,7 +261,11 @@ export function App() {
     const boardCv = desk.parts.get('board') as HTMLCanvasElement | undefined;
     const bs = desk.sizes.get('board');
     if (!waiting) scoreText.current = (d['score'] ?? '').padStart(6, ' ');
-    if (boardCv && bs) painters.board.draw(boardCv, bs.w, bs.h, { match: view.live ? 'ЕФІР' : 'П ' + view.match, tick: 'Т ' + String(tick).padStart(4, '0'), focus: s.nick.toUpperCase(), score: scoreText.current });
+    if (boardCv && bs) {
+      const flips = painters.board.draw(boardCv, bs.w, bs.h, { match: view.live ? 'ЕФІР' : 'П ' + view.match, tick: 'Т ' + String(tick).padStart(4, '0'), focus: s.nick.toUpperCase(), score: scoreText.current });
+      if (flips > 0) sound.flaps(flips);
+    }
+    sound.airLit(!!view.live && view.live.state === 'live');
 
     for (const [name, max] of METERS) {
       const el = desk.parts.get('vu-' + name);
@@ -404,6 +413,8 @@ export function App() {
     return () => cancelAnimationFrame(id);
   }, [playing, cur]);
 
+  useEffect(() => sound.spin(playing && !!cur), [playing, cur]);
+
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
       const el = e.target as HTMLElement | null;
@@ -413,13 +424,22 @@ export function App() {
         if (typing) el.blur();
         return;
       }
+      if (typing && el.tagName === 'INPUT') sound.key();
+      if (e.code === 'KeyM' && !typing) sound.toggleMute();
       if (e.code === 'Space' && !typing && !viewRef.current.live) {
         e.preventDefault();
         toggleRef.current();
       }
     };
+    const wake = (): void => sound.unlock();
+    window.addEventListener('keydown', wake, true);
+    window.addEventListener('pointerdown', wake, true);
     window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('keydown', wake, true);
+      window.removeEventListener('pointerdown', wake, true);
+      window.removeEventListener('keydown', key);
+    };
   }, []);
 
   useEffect(() => {
@@ -451,12 +471,13 @@ export function App() {
   };
 
   const goTick = (s: string): void => {
-    if (s === '+1') {
-      setTick(tickRef.current + 1);
-      return;
+    const from = tickRef.current;
+    if (s === '+1') setTick(from + 1);
+    else {
+      const n = Number(s.trim());
+      if (Number.isInteger(n)) setTick(n);
     }
-    const n = Number(s.trim());
-    if (Number.isInteger(n)) setTick(n);
+    sound.seek(from, tickRef.current);
   };
   const goMatch = (s: string): void => {
     const n = Number(s);
@@ -474,18 +495,24 @@ export function App() {
     const h = host.current;
     if (!h) return;
     set({ promote: '…' });
+    sound.lever();
+    const said = (status: string): void => {
+      set({ promote: status });
+      sound.answer(status);
+    };
     void h.promote(preset).then(
-      (r) => set({ promote: String(r.status) }),
-      () => set({ promote: 'err' }),
+      (r) => said(String(r.status)),
+      () => said('err'),
     );
   };
 
   const acts = useRef({ set, goMatch, goTick, promote, setPreset });
   acts.current = { set, goMatch, goTick, promote, setPreset };
-  const act = useMemo<Act>(() => ({ set: (p) => acts.current.set(p), goMatch: (x) => acts.current.goMatch(x), goTick: (x) => acts.current.goTick(x), promote: () => acts.current.promote(), setPreset: (x) => acts.current.setPreset(x) }), []);
+  const act = useMemo<Act>(() => ({ set: (p) => acts.current.set(p), goMatch: (x) => acts.current.goMatch(x), goTick: (x) => acts.current.goTick(x), promote: () => acts.current.promote(), setPreset: (x) => acts.current.setPreset(x), sfx: sound }), []);
   const toggle = useMemo(
     () => () => {
       if (!st.current.playing && tickRef.current >= (st.current.m?.ticks ?? 1200)) setTickRef.current(0);
+      sound.button();
       setPlaying(!st.current.playing);
     },
     [],
@@ -502,6 +529,7 @@ export function App() {
           <span className="sign">{view.live ? (view.live.state === 'end' ? 'КІНЕЦЬ' : 'ЕФІР') : 'ЗАПИС'}</span>
           <A name="live-state" reg={reg} />
           <A name="live-lag" label="відстав." reg={reg} />
+          <button className={'mute' + (muted ? ' off' : '')} title="звук: клавіша M" onClick={(e) => { sound.toggleMute(); e.currentTarget.blur(); }}>{muted ? '♪ вимк.' : '♪ увімк.'}</button>
         </Dev>
         {METERS.map(([name], i) => (
           <Dev key={name} at={('vu' + (i + 1)) as Device}>

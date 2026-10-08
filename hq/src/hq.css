@@ -95,3 +95,5 @@ body { font-family: 'Courier New', ui-monospace, monospace; color: #9dff9f; }
 .flaps, .tubes { contain: strict; }
 .board { position: absolute; display: block; pointer-events: none; }
 .flapKey { position: absolute; color: transparent; font-size: 0.5cqw; overflow: hidden; contain: strict; user-select: none; }
+.onAir .mute { font: 700 0.75cqw/1 'Arial', sans-serif; color: #9dff9f; background: rgba(0, 0, 0, 0.5); border: 1px solid #2f4a33; border-radius: 0.2cqw; padding: 0.15cqw 0.4cqw; cursor: pointer; }
+.onAir .mute.off { color: #8a7d74; }
