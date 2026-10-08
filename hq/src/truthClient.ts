@@ -13,14 +13,19 @@ export class TruthClient {
   private readonly wanted = new Map<number, string>();
   private readonly ids = new Map<string, number>();
   onAnswer: (a: TruthAnswer) => void = () => undefined;
-  onLive: (t: number, score: number | null) => void = () => undefined;
+  onLive: (t: number, score: number | null, scene: TruthAt | null) => void = () => undefined;
+  onLand: (match: number, land: [string, string][]) => void = () => undefined;
 
   constructor() {
     this.worker = new TruthWorker();
     this.worker.onmessage = (e: MessageEvent<FromTruth>) => {
       const m = e.data;
       if (m.kind === 'live') {
-        this.onLive(m.t, m.score);
+        this.onLive(m.t, m.score, m.scene);
+        return;
+      }
+      if (m.kind === 'opened') {
+        this.onLand(m.match, m.land);
         return;
       }
       if (m.kind !== 'truth') return;

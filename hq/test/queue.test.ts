@@ -23,7 +23,10 @@ test('open answers with the match length and at answers with the truth', () => {
   const h = harness();
   h.q.handle({ kind: 'open', match: 1, bytes: bytes(1) });
   h.drain();
-  assert.deepEqual(h.out[0], { kind: 'opened', match: 1, ticks: 1200 });
+  const opened = h.out[0];
+  assert.equal(opened?.kind, 'opened');
+  assert.equal(opened?.kind === 'opened' && opened.ticks, 1200);
+  assert.ok(opened?.kind === 'opened' && opened.land.length > 100);
   h.q.handle({ kind: 'at', match: 1, t: 100, id: 7 });
   h.drain();
   const r = h.out.at(-1);

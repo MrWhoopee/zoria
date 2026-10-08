@@ -45,3 +45,28 @@ test('manifest needles come from the journal manifest', () => {
   assert.ok(n.includes('5,-12'));
   assert.equal(new Set(n).size, n.length);
 });
+
+test('truth carries the scene of the tick: units, threads, jams, scans and the order', () => {
+  const t = new Truth(bytes(1));
+  const got = t.at(600);
+  const fresh = openJournal(createEngine, bytes(1));
+  fresh.seek(600);
+  const E = fresh.engine as unknown as {
+    SIM: { units: { id: string; p: string; cls: string; q: number; r: number; from: number; until: number }[]; world: { jam: Record<string, { until: number }>; scan: Record<string, { q: number; r: number; rad: number } | null> }; order: { cells: string[]; from: number; to: number } | null };
+    linkTree(p: string, w: unknown): { aq: number; ar: number; bq: number; br: number }[];
+  };
+  const alive = E.SIM.units.filter((u) => u.from <= 600 && 600 < u.until).map((u) => [u.id, u.p, u.cls, u.q, u.r]);
+  assert.ok(alive.length > 5);
+  assert.deepEqual(got.units, alive);
+  assert.deepEqual(got.links['B'], E.linkTree('B', E.SIM.world).flatMap((l) => [l.aq, l.ar, l.bq, l.br]));
+  assert.deepEqual(got.jam, Object.keys(E.SIM.world.jam).filter((k) => (E.SIM.world.jam[k]?.until ?? 0) > 600));
+  assert.equal(got.scans.length, Object.values(E.SIM.world.scan).filter(Boolean).length);
+  assert.deepEqual(got.order, E.SIM.order && E.SIM.order.from <= 600 && 600 <= E.SIM.order.to ? E.SIM.order.cells : []);
+});
+
+test('the land of a match lists every non-bare cell once', () => {
+  const land = new Truth(bytes(1)).land();
+  assert.ok(land.length > 100);
+  assert.equal(new Set(land.map(([k]) => k)).size, land.length);
+  assert.ok(land.every(([, type]) => type !== 'bare'));
+});

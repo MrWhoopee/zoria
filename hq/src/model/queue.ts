@@ -5,7 +5,7 @@ import type { LiveStartMsg, LiveTickMsg } from './live.ts';
 
 export type ToTruth = { kind: 'open'; match: number; bytes: ArrayBuffer } | { kind: 'at'; match: number; t: number; id: number } | ({ kind: 'live-start' } & LiveStartMsg) | ({ kind: 'live-tick' } & LiveTickMsg) | { kind: 'live-end'; shares: number[] };
 
-export type FromTruth = { kind: 'opened'; match: number; ticks: number } | { kind: 'truth'; match: number; id: number; at: TruthAt } | { kind: 'missing'; match: number; id: number } | { kind: 'failed'; match: number; why: string } | { kind: 'live'; t: number; score: number | null };
+export type FromTruth = { kind: 'opened'; match: number; ticks: number; land: [string, string][] } | { kind: 'truth'; match: number; id: number; at: TruthAt } | { kind: 'missing'; match: number; id: number } | { kind: 'failed'; match: number; why: string } | { kind: 'live'; t: number; score: number | null; scene: TruthAt | null };
 
 export class TruthQueue {
   private readonly matches = new Map<number, Truth>();
@@ -27,7 +27,7 @@ export class TruthQueue {
     }
     if (m.kind === 'live-tick') {
       const at = this.live.tick(m);
-      this.send({ kind: 'live', t: at.t, score: at.score });
+      this.send({ kind: 'live', t: at.t, score: at.score, scene: at.scene });
       return;
     }
     if (m.kind === 'live-end') {
@@ -38,7 +38,7 @@ export class TruthQueue {
       try {
         const truth = new Truth(new Uint8Array(m.bytes));
         this.matches.set(m.match, truth);
-        this.send({ kind: 'opened', match: m.match, ticks: truth.ticks });
+        this.send({ kind: 'opened', match: m.match, ticks: truth.ticks, land: truth.land() });
       } catch (e) {
         this.send({ kind: 'failed', match: m.match, why: e instanceof Error ? e.message : String(e) });
       }

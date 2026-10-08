@@ -1,21 +1,29 @@
-import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import room from './assets/room.webp';
 import { parseCell } from './anchors.ts';
 import { loadPack } from './data.ts';
 import { connect } from './host.ts';
 import type { Host, PackEntry } from './host.ts';
-import { DEVICES, place } from './layout.ts';
+import { DECK, DEVICES, ENGRAVE, KNOBS, LAMPS, PLATES, REELS, TUBES, place } from './layout.ts';
 import type { Device } from './layout.ts';
 import { channelOf, derive, focusNick, initial, slotOf } from './model/derive.ts';
-import type { Mode, PackData, View } from './model/derive.ts';
+import type { LiveView, Mode, PackData, View } from './model/derive.ts';
 import type { TruthAt } from './model/truth.ts';
 import { TruthClient } from './truthClient.ts';
-import { MapScreen } from './view/MapScreen.tsx';
-import type { MapProps } from './view/MapScreen.tsx';
+import { MapPainter, MapScreen } from './view/MapScreen.tsx';
+import type { MapState } from './view/MapScreen.tsx';
+import { Board, BoardPainter, Spot, Tubes } from './view/Devices.tsx';
+import type { Reg } from './view/Devices.tsx';
+import { Desk } from './view/desk.ts';
 
 const PRESETS = ['глушій-2', 'глушій', 'варта', 'основний', 'рівний', 'обхідник'];
 const MODES: Mode[] = ['truth', 'belief', 'both'];
+const PLAY_RATE = 30;
+const MODE_NAME: Record<Mode, string> = { truth: 'правда', belief: 'віра', both: 'обидва' };
+const METERS: [string, number][] = [['bytes', 320], ['orders', 10], ['denied', 4]];
+const VALUE_ANCHORS = new Set(['match', 'tick', 'focus', 'score', 'needles', 'shares']);
+const TRUTH_ANCHORS = new Set(['score', 'needles', 'cell-owner-truth', 'diff-count']);
 
 const STYLES = Object.fromEntries((Object.keys(DEVICES) as Device[]).map((d) => [d, place(DEVICES[d])])) as Record<Device, ReturnType<typeof place>>;
 
@@ -27,11 +35,11 @@ function Dev({ at, children, className }: { at: Device; children?: ReactNode; cl
   );
 }
 
-const A = memo(function A({ name, v, label }: { name: string; v: string | undefined; label?: string }) {
+const A = memo(function A({ name, label, reg }: { name: string; label?: string; reg: Reg }) {
   return (
     <span className="a">
       {label ? <i>{label}</i> : null}
-      <b data-zaria={name}>{v ?? ''}</b>
+      <b data-zaria={name} ref={reg(name)} />
     </span>
   );
 });
@@ -59,55 +67,105 @@ function Field({ name, value, placeholder, commit }: { name: string; value: stri
   );
 }
 
-const Meter = memo(function Meter({ value, max }: { value: number; max: number }) {
-  const angle = -48 + 96 * Math.min(1, Math.max(0, value / max));
-  return <div className="needle" style={{ transform: 'rotate(' + angle + 'deg)' }} />;
-});
-
 const keyOf = (pack: string | null, match: number, t: number): string => pack + ':' + match + ':' + t;
 
-type Answer = { key: string; at: TruthAt } | null;
-let answer: Answer = null;
-const listeners = new Set<() => void>();
-const answers = {
-  set(a: Answer): void {
-    answer = a;
-    for (const f of listeners) f();
-  },
-  subscribe(f: () => void): () => void {
-    listeners.add(f);
-    return () => listeners.delete(f);
-  },
-  get: (): Answer => answer,
-};
-
 type Pair = { a: PackData; b: PackData } | null;
-let last: { view: View; cur: PackData | null; at: TruthAt | null; pair: Pair; out: Record<string, string> } | null = null;
-function derived(view: View, cur: PackData | null, at: TruthAt | null, pair: Pair): Record<string, string> {
-  if (last && last.view === view && last.cur === cur && last.at === at && last.pair === pair) return last.out;
-  const out = derive(view, cur, at, pair);
-  last = { view, cur, at, pair, out };
-  return out;
+
+interface Act {
+  set: (p: Partial<View>) => void;
+  goMatch: (s: string) => void;
+  goTick: (s: string) => void;
+  promote: () => void;
+  setPreset: (p: string) => void;
 }
 
-function useTruth(view: View): TruthAt | null {
-  const a = useSyncExternalStore(answers.subscribe, answers.get);
-  return a && a.key === keyOf(view.pack, view.match, view.tick) ? a.at : null;
-}
-
-const TA = memo(function TA({ name, label, view, cur, pair }: { name: string; label?: string; view: View; cur: PackData | null; pair: Pair }) {
-  const at = useTruth(view);
-  return <A name={name} v={derived(view, cur, at, pair)[name]} label={label} />;
+const Reels = memo(function Reels() {
+  return (
+    <>
+      {REELS.map((b, i) => (
+        <Spot key={i} b={b} className="reel">
+          <i className="spokes" />
+        </Spot>
+      ))}
+    </>
+  );
 });
 
-const LiveMap = memo(function LiveMap(props: Omit<MapProps, 'truth'> & { view: View }) {
-  const at = useTruth(props.view);
-  const shown = useRef<TruthAt | null>(null);
-  if (at) shown.current = at;
-  const { view: _, ...rest } = props;
-  return <MapScreen {...rest} truth={shown.current?.owners ?? null} />;
+const Legend = memo(function Legend({ roster }: { roster: string[] }) {
+  return (
+    <>
+      <div className="legend">
+        {roster.map((n, i) => (
+          <span key={n} style={{ color: ['#ffb347', '#4fe3d4', '#f27be8'][i] }}>● {n}</span>
+        ))}
+        <span>▲ ткач</span>
+        <span>◆ клинок</span>
+        <span>■ Ключник</span>
+        <span style={{ color: '#ff6a5c' }}>✕ глушіння</span>
+      </div>
+      <div className="glass" />
+    </>
+  );
 });
-const m0 = (d: PackData | null, match: number) => d?.matches[match - 1] ?? null;
+
+const Knobs = memo(function Knobs({ match, mode, nick, roster, live, act }: { match: number; mode: Mode; nick: string; roster: string[]; live: boolean; act: Act }) {
+  return (
+    <>
+      <Spot b={KNOBS.knob1} className={'knob k' + (match - 1)}>
+        <select data-zaria="go-match" value={match} onChange={(e) => act.goMatch(e.target.value)}>{[1, 2, 3].map((n) => <option key={n} value={n}>{'партія ' + n}</option>)}</select>
+      </Spot>
+      <Spot b={KNOBS.knob2} className={'knob k' + MODES.indexOf(mode)}>
+        <select data-zaria="go-mode" value={mode} onChange={(e) => act.set({ mode: e.target.value as Mode })}>{MODES.map((x) => <option key={x} value={x}>{MODE_NAME[x]}</option>)}</select>
+      </Spot>
+      <Spot b={KNOBS.knob3} className={'knob k' + Math.max(0, roster.indexOf(nick))}>
+        <select data-zaria="go-focus" value={nick} onChange={(e) => act.set({ focus: e.target.value })}>{(roster.length ? roster : [nick]).map((n) => <option key={n} value={n}>{n}</option>)}</select>
+      </Spot>
+      <Spot b={PLATES.knob1} className="plate"><i>ПАРТІЯ</i><b>{live ? 'ефір' : match}</b></Spot>
+      <Spot b={PLATES.knob2} className="plate"><i>ШАР</i><b>{MODE_NAME[mode]}</b></Spot>
+      <Spot b={PLATES.knob3} className="plate"><i>ЧИЇМИ ОЧИМА</i><b>{nick}</b></Spot>
+    </>
+  );
+});
+
+const Drawer = memo(function Drawer({ packs, pack, act }: { packs: PackEntry[]; pack: string | null; act: Act }) {
+  return (
+    <Dev at="drawer" className="drawer">
+      {packs.map((p) => (
+        <button key={p.id} className={p.id === pack ? 'on' : ''} data-zaria="go-pack" data-zaria-value={p.id} onClick={() => act.set({ pack: p.id })}>
+          {p.id}
+        </button>
+      ))}
+    </Dev>
+  );
+});
+
+const Lever = memo(function Lever({ preset, status, act, reg }: { preset: string; status: string; act: Act; reg: Reg }) {
+  return (
+    <Dev at="lever" className={'lever s' + status}>
+      <select data-zaria="go-preset" value={preset} onChange={(e) => act.setPreset(e.target.value)}>
+        {PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+      </select>
+      <button data-zaria="do-promote" onClick={act.promote}>в бій</button>
+      <A name="promote-status" label="відповідь" reg={reg} />
+    </Dev>
+  );
+});
+
+const Deck = memo(function Deck({ playing, ticks, toggle, act, part }: { playing: boolean; ticks: number; toggle: () => void; act: Act; part: Desk['part'] }) {
+  return (
+    <>
+      <Spot b={DECK.play} className="deckBtn">
+        <button title="пробіл" onClick={toggle}>{playing ? '❚❚' : '▶'}</button>
+      </Spot>
+      <Spot b={DECK.step} className="deckBtn">
+        <button onClick={() => act.goTick('+1')}>+1</button>
+      </Spot>
+      <Spot b={DECK.slider} className="deckSlider">
+        <input ref={part('slider')} type="range" min={0} max={ticks} defaultValue={0} onChange={(e) => act.goTick(e.target.value)} />
+      </Spot>
+    </>
+  );
+});
 
 export function App() {
   const host = useRef<Host | null>(null);
@@ -117,43 +175,177 @@ export function App() {
   const [view, setView] = useState<View>(initial());
   const [playing, setPlaying] = useState(false);
   const [preset, setPreset] = useState(PRESETS[0] ?? '');
-  const [big, setBig] = useState(false);
+  const [cam, setCam] = useState<{ zoom: number; style: Record<string, string> } | null>(null);
+  const zoom = cam?.zoom ?? 0;
+  const [lands, setLands] = useState<Record<number, [string, string][]>>({});
+  const roomRef = useRef<HTMLDivElement | null>(null);
   const opened = useRef(new Set<string>());
   const liveOn = useRef(false);
   const readySent = useRef(false);
+  const desk = useRef(new Desk()).current;
+  const painters = useRef({ board: new BoardPainter(), map: new MapPainter() }).current;
+  const tickRef = useRef(0);
+  const liveRef = useRef<LiveView>({ cap: 0, state: 'live', shares: null, score: null });
+  const answer = useRef<{ key: string; at: TruthAt } | null>(null);
+  const shownTruth = useRef<TruthAt | null>(null);
+  const asked = useRef('');
+  const mapSeen = useRef<unknown[]>([]);
+  const scoreText = useRef('');
 
-  const set = (patch: Partial<View>): void => setView((v) => ((Object.keys(patch) as (keyof View)[]).every((k) => v[k] === patch[k]) ? v : { ...v, ...patch }));
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const set = (patch: Partial<View>): void => {
+    const same = (v: View): boolean => (Object.keys(patch) as (keyof View)[]).every((k) => v[k] === patch[k]);
+    if (same(viewRef.current)) return;
+    setView((v) => (same(v) ? v : { ...v, ...patch }));
+  };
   const cur = view.pack ? data[view.pack] ?? null : null;
   const slotNo = (pack: string, match: number): number => (Object.keys(data).indexOf(pack) + 1) * 10 + match;
+  const pa = data['preset-a'];
+  const pb = data['preset-b'];
+  const pair = useMemo<Pair>(() => (pa && pb ? { a: pa, b: pb } : null), [pa, pb]);
+  const m = cur?.matches[view.match - 1] ?? null;
+  const nick = focusNick(view, cur);
+  const roster = m?.roster ?? [];
+
+  const st = useRef({ cur, pair, lands, zoom, playing, slotNo, nick, m });
+  st.current = { cur, pair, lands, zoom, playing, slotNo, nick, m };
+
+  const paint = (): void => {
+    const s = st.current;
+    const base = viewRef.current;
+    const tick = tickRef.current;
+    const view: View = { ...base, tick, live: base.live ? liveRef.current : null };
+    const t = truth.current;
+    if (t && s.cur && view.pack && !view.live) {
+      const key = keyOf(view.pack, view.match, tick);
+      if (asked.current !== key) {
+        asked.current = key;
+        t.ask(s.slotNo(view.pack, view.match), tick, key);
+      }
+    }
+    const key = view.live ? 'live:' + tick : keyOf(view.pack, view.match, tick);
+    const at = answer.current && answer.current.key === key ? answer.current.at : null;
+    if (at) shownTruth.current = at;
+    const d = derive(view, s.cur, at, s.pair);
+
+    const waiting = !at && !view.live;
+    for (const [name, el] of desk.anchors) {
+      if (waiting && TRUTH_ANCHORS.has(name)) continue;
+      const val = d[name] ?? '';
+      if (!desk.changed('a:' + name, val)) continue;
+      if (VALUE_ANCHORS.has(name)) el.setAttribute('data-zaria-value', val);
+      else el.textContent = val;
+    }
+    for (const [name, digits] of [['needles', d['needles'] ?? ''], ['shares', (d['shares'] ?? '').split(',').map((n) => n.slice(-1)).join('')]] as const) {
+      const el = desk.anchors.get(name);
+      if (waiting && name === 'needles') continue;
+      if (!el || !desk.changed('t:' + name, digits)) continue;
+      const tubes = el.children;
+      const padded = digits.padStart(tubes.length, ' ').slice(-tubes.length);
+      for (let i = 0; i < tubes.length; i++) {
+        const ch = padded[i] ?? ' ';
+        const tube = tubes[i] as HTMLElement;
+        if (tube.textContent !== ch) tube.textContent = ch === ' ' ? '' : ch;
+      }
+    }
+
+    const boardCv = desk.parts.get('board') as HTMLCanvasElement | undefined;
+    const bs = desk.sizes.get('board');
+    if (!waiting) scoreText.current = (d['score'] ?? '').padStart(6, ' ');
+    if (boardCv && bs) painters.board.draw(boardCv, bs.w, bs.h, { match: view.live ? 'ЕФІР' : 'П ' + view.match, tick: 'Т ' + String(tick).padStart(4, '0'), focus: s.nick.toUpperCase(), score: scoreText.current });
+
+    for (const [name, max] of METERS) {
+      const el = desk.parts.get('vu-' + name);
+      const angle = String(Math.round(-48 + 96 * Math.min(1, Math.max(0, Number(d[name] || 0) / max))));
+      if (el instanceof HTMLElement && desk.changed('vu:' + name, angle)) el.style.transform = 'rotate(' + angle + 'deg)';
+    }
+    const slider = desk.parts.get('slider') as HTMLInputElement | undefined;
+    if (slider && slider.value !== String(tick)) slider.value = String(tick);
+    const field = desk.parts.get('goTick') as HTMLInputElement | undefined;
+    if (field && document.activeElement !== field && field.value !== String(tick)) field.value = String(tick);
+    const line = desk.parts.get('sparkAt');
+    if (line && desk.changed('spark', String(tick))) {
+      line.setAttribute('x1', String(tick));
+      line.setAttribute('x2', String(tick));
+    }
+    const lamps = [s.playing, !!view.live && view.live.state === 'live', !!s.cur || !!view.live, Number(d['denied'] || 0) > 0, view.promote === '409' || view.promote === '503', view.promote === '200'];
+    lamps.forEach((on, i) => {
+      const el = desk.parts.get('lamp' + i);
+      if (el && desk.changed('lamp' + i, on ? '1' : '0')) el.classList.toggle('on', on);
+    });
+
+    const mapCv = desk.parts.get('map') as HTMLCanvasElement | undefined;
+    const ms = desk.sizes.get('map');
+    if (mapCv && ms) {
+      const own = s.m?.diary && s.nick === s.cur?.summary.belief?.nick && view.mode !== 'truth' ? s.m.diary.at(tick).own : null;
+      const state: MapState = { needles: s.m?.needles ?? [], land: view.pack ? s.lands[s.slotNo(view.pack, view.match)] ?? null : null, truth: shownTruth.current, belief: own, mode: view.mode, cell: view.cell, ghost: d['ghost-cell'] ?? '', zoom: Math.max(1, s.zoom) };
+      const sig = [state.needles, state.land, state.truth, state.belief, state.mode, state.cell, state.ghost, state.zoom, ms.w];
+      if (sig.some((x, i) => x !== mapSeen.current[i])) {
+        mapSeen.current = sig;
+        painters.map.draw(mapCv, ms.w, state);
+      }
+    }
+
+    if (view.live) {
+      const h = host.current;
+      requestAnimationFrame(() => h?.ready(tick));
+    }
+  };
+  const paintRef = useRef(paint);
+  paintRef.current = paint;
+  desk.onResize = () => paintRef.current();
+
+  const setTick = (n: number): void => {
+    const end = st.current.m?.ticks ?? 1200;
+    const t = Math.max(0, Math.min(end, n));
+    if (t === tickRef.current) return;
+    tickRef.current = t;
+    paintRef.current();
+  };
+
+  useLayoutEffect(() => paint());
 
   useEffect(() => {
     const t = new TruthClient();
     truth.current = t;
-    t.onAnswer = (a) => answers.set(a);
-    t.onLive = (tick, score) => setView((v) => (v.live ? { ...v, tick, live: { ...v.live, score } } : v));
+    t.onAnswer = (a) => {
+      answer.current = a;
+      paintRef.current();
+    };
+    t.onLive = (tick, score, scene) => {
+      if (scene) answer.current = { key: 'live:' + tick, at: scene };
+      tickRef.current = tick;
+      liveRef.current = { ...liveRef.current, score };
+      paintRef.current();
+    };
+    t.onLand = (slot, land) => setLands((x) => ({ ...x, [slot]: land }));
     const toBytes = (x: unknown): Uint8Array => (x instanceof Uint8Array ? x : x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x as number[]));
     const startLive = (h: Host): void => {
       const L = h.live();
       if (!L) return;
       t.send({ kind: 'live-start', manifest: toBytes(L.manifest), bots: L.bots, roster: L.roster, ticks: L.ticks, seat: L.seat });
-      setView((v) => ({ ...v, pack: null, tick: 0, focus: L.roster[L.seat] ?? '', live: { cap: 0, state: 'live', shares: null, score: null } }));
+      tickRef.current = 0;
+      liveRef.current = { cap: 0, state: 'live', shares: null, score: null };
+      setView((v) => ({ ...v, pack: null, tick: 0, focus: L.roster[L.seat] ?? '', live: liveRef.current }));
       liveOn.current = true;
     };
     void connect('Оперативна').then((h) => {
       host.current = h;
       h.on('live', () => startLive(h));
-      h.on('tick', (m) => {
+      h.on('tick', (msg) => {
         if (!liveOn.current) return;
-        const submits = ((m['submits'] as [string, unknown][]) ?? []).map(([slot, frame]) => [slot, toBytes(frame)] as [string, Uint8Array]);
-        const denies = (m['denies'] as [string, number, number][]) ?? [];
-        t.send({ kind: 'live-tick', t: Number(m['t']), submits, denies });
-        const cap = Number(m['cap'] ?? m['t']);
-        setView((v) => (v.live ? { ...v, live: { ...v.live, cap } } : v));
+        const submits = ((msg['submits'] as [string, unknown][]) ?? []).map(([slot, frame]) => [slot, toBytes(frame)] as [string, Uint8Array]);
+        const denies = (msg['denies'] as [string, number, number][]) ?? [];
+        t.send({ kind: 'live-tick', t: Number(msg['t']), submits, denies });
+        liveRef.current = { ...liveRef.current, cap: Number(msg['cap'] ?? msg['t']) };
+        paintRef.current();
       });
-      h.on('end', (m) => {
-        const shares = (m['shares'] as number[]) ?? [];
+      h.on('end', (msg) => {
+        const shares = (msg['shares'] as number[]) ?? [];
         t.send({ kind: 'live-end', shares });
-        setView((v) => (v.live ? { ...v, live: { ...v.live, state: 'end', shares, cap: Number(m['t'] ?? v.live.cap) } } : v));
+        liveRef.current = { ...liveRef.current, state: 'end', shares, cap: Number(msg['t'] ?? liveRef.current.cap) };
+        setView((v) => (v.live ? { ...v, live: liveRef.current } : v));
       });
       if (h.mode === 'live') startLive(h);
       const list = h.packs();
@@ -173,68 +365,91 @@ export function App() {
   useEffect(() => {
     const t = truth.current;
     if (!t || !cur || !view.pack) return;
-    cur.matches.forEach((m, i) => {
+    cur.matches.forEach((mm, i) => {
       const k = view.pack + ':' + (i + 1);
       if (opened.current.has(k)) return;
       opened.current.add(k);
-      t.open(slotNo(view.pack ?? '', i + 1), m.bytes);
+      t.open(slotNo(view.pack ?? '', i + 1), mm.bytes);
     });
   }, [cur, view.pack]);
 
   useEffect(() => {
-    const t = truth.current;
-    if (!t || !cur || !view.pack || view.live) return;
-    t.ask(slotNo(view.pack, view.match), view.tick, keyOf(view.pack, view.match, view.tick));
-  }, [cur, view.pack, view.match, view.tick, view.live]);
-
-  useEffect(() => {
     if (!playing || !cur) return;
     let id = 0;
-    const step = (): void => {
-      setView((v) => {
-        const end = cur.matches[v.match - 1]?.ticks ?? 1200;
-        if (v.tick >= end) {
+    let last = performance.now();
+    let carry = 0;
+    const step = (now: number): void => {
+      carry += ((now - last) * PLAY_RATE) / 1000;
+      last = now;
+      const n = Math.floor(carry);
+      carry -= n;
+      if (n > 0) {
+        const end = st.current.m?.ticks ?? 1200;
+        if (tickRef.current >= end) {
           setPlaying(false);
-          return v;
+          return;
         }
-        return { ...v, tick: v.tick + 1 };
-      });
+        setTick(tickRef.current + n);
+      }
       id = requestAnimationFrame(step);
     };
     id = requestAnimationFrame(step);
     return () => cancelAnimationFrame(id);
   }, [playing, cur]);
 
-  const sparkSlot = cur ? slotOf(view, cur) : '';
-  const spark = useMemo(() => (m0(cur, view.match) && cur ? channelOf(m0(cur, view.match)!, sparkSlot).series.map((p) => p.t + ',' + (40 - Math.min(40, p.bytes / 8))).join(' ') : ''), [cur, view.match, sparkSlot]);
-  const pa = data['preset-a'];
-  const pb = data['preset-b'];
-  const pair = useMemo(() => (pa && pb ? { a: pa, b: pb } : null), [pa, pb]);
-  const v = useMemo(() => derive(view, cur, null, pair), [view, cur, pair]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent): void => {
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA');
+      if (e.key === 'Escape') {
+        setCam(null);
+        if (typing) el.blur();
+        return;
+      }
+      if (e.code === 'Space' && !typing && !viewRef.current.live) {
+        e.preventDefault();
+        setPlaying((p) => !p);
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
 
   useEffect(() => {
-    if (!view.live) return;
-    const id = requestAnimationFrame(() => host.current?.ready(view.tick));
-    return () => cancelAnimationFrame(id);
-  }, [view.live, view.tick]);
+    if (zoom <= 1) return;
+    const again = (): void => zoomIn();
+    window.addEventListener('resize', again);
+    return () => window.removeEventListener('resize', again);
+  }, [zoom > 1]);
+
+  const sparkSlot = cur ? slotOf(view, cur) : '';
+  const spark = useMemo(() => (m && cur ? channelOf(m, sparkSlot).series.map((p) => p.t + ',' + (40 - Math.min(40, p.bytes / 8))).join(' ') : ''), [cur, m, sparkSlot]);
 
   useEffect(() => {
     if (readySent.current || !cur) return;
     readySent.current = true;
-    requestAnimationFrame(() => host.current?.ready(view.tick));
-  }, [cur, view.tick]);
+    requestAnimationFrame(() => host.current?.ready(tickRef.current));
+  }, [cur]);
 
-  const m = cur?.matches[view.match - 1] ?? null;
-  const nick = focusNick(view, cur);
-  const belief = m?.diary && nick === cur?.summary.belief?.nick ? m.diary.at(view.tick).own : null;
-  const roster = m?.roster ?? [];
-  const status = !cur ? 'red' : playing ? 'green' : 'amber';
+  const zoomIn = (): void => {
+    const el = roomRef.current;
+    if (!el) return;
+    const r0 = DEVICES.round;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    const z = Math.min(window.innerWidth / ((w * r0.w) / 100), window.innerHeight / ((h * r0.h) / 100)) * 0.92;
+    const cx = el.offsetLeft + (w * (r0.x + r0.w / 2)) / 100;
+    const cy = el.offsetTop + (h * (r0.y + r0.h / 2)) / 100;
+    setCam({ zoom: z, style: { transformOrigin: r0.x + r0.w / 2 + '% ' + (r0.y + r0.h / 2) + '%', transform: 'translate(' + (window.innerWidth / 2 - cx) + 'px, ' + (window.innerHeight / 2 - cy) + 'px) scale(' + z + ')' } });
+  };
 
   const goTick = (s: string): void => {
+    if (s === '+1') {
+      setTick(tickRef.current + 1);
+      return;
+    }
     const n = Number(s.trim());
-    if (!Number.isInteger(n)) return;
-    const end = m?.ticks ?? 1200;
-    set({ tick: Math.max(0, Math.min(end, n)) });
+    if (Number.isInteger(n)) setTick(n);
   };
   const goMatch = (s: string): void => {
     const n = Number(s);
@@ -254,94 +469,79 @@ export function App() {
     void h.promote(preset).then((r) => set({ promote: String(r.status) }));
   };
 
+  const acts = useRef({ set, goMatch, goTick, promote, setPreset });
+  acts.current = { set, goMatch, goTick, promote, setPreset };
+  const act = useMemo<Act>(() => ({ set: (p) => acts.current.set(p), goMatch: (x) => acts.current.goMatch(x), goTick: (x) => acts.current.goTick(x), promote: () => acts.current.promote(), setPreset: (x) => acts.current.setPreset(x) }), []);
+  const toggle = useMemo(() => () => setPlaying((p) => !p), []);
+  const reg = desk.reg;
+
   return (
     <div className="stage">
-      <div className={'room' + (playing ? ' playing' : '')}>
+      <div ref={roomRef} className={'room' + (playing ? ' playing' : '') + (zoom > 1 ? ' zoomed' : '')} style={cam?.style}>
         <img className="photo" src={room} alt="" draggable={false} />
-        <Dev at="board">
-          <span className="flap"><A name="match" v={v['match']} label="ПАРТІЯ" /> <span className="a"><i>ТАКТ</i><b>{String(view.tick).padStart(4, '0')}</b></span></span>
-          <span className="flap"><A name="focus" v={v['focus']} /> <TA name="score" view={view} cur={cur} pair={pair} /></span>
-        </Dev>
+        <Board canvas={desk.part('board', true)} reg={reg} />
         <Dev at="onAir" className={view.live ? 'lit' : ''}>
-          <span className="sign">{view.live ? (view.live.state === 'end' ? 'КІНЕЦЬ' : 'В ЕФІРІ') : 'ЗАПИС'}</span>
-          <A name="live-state" v={v['live-state']} />
+          <span className="sign">{view.live ? (view.live.state === 'end' ? 'КІНЕЦЬ' : 'ЕФІР') : 'ЗАПИС'}</span>
+          <A name="live-state" reg={reg} />
+          <A name="live-lag" label="відстав." reg={reg} />
         </Dev>
-        <Dev at="vu1"><Meter value={Number(v['bytes'] || 0)} max={320} /><A name="bytes" v={v['bytes']} label="байти" /></Dev>
-        <Dev at="vu2"><Meter value={Number(v['orders'] || 0)} max={10} /><A name="orders" v={v['orders']} label="команди" /></Dev>
-        <Dev at="vu3"><Meter value={Number(v['denied'] || 0)} max={4} /><A name="denied" v={v['denied']} label="відмови" /></Dev>
-        <Dev at="wall">
-          <A name="shares" v={v['shares']} label="частки" />
-          <TA name="needles" view={view} cur={cur} pair={pair} label="голки горять" />
-        </Dev>
+        {METERS.map(([name], i) => (
+          <Dev key={name} at={('vu' + (i + 1)) as Device}>
+            <div className="needle" ref={desk.part('vu-' + name)} />
+            <A name={name} label={['байти', 'команди', 'відмови'][i]} reg={reg} />
+          </Dev>
+        ))}
         <Dev at="left" className="mon">
           <span className="title">РОЗВІДКА</span>
-          <A name="mode" v={v['mode']} label="шар" />
-          <A name="cell" v={v['cell']} label="сота" />
-          <TA name="cell-owner-truth" view={view} cur={cur} pair={pair} label="правда" />
-          <A name="cell-owner-belief" v={v['cell-owner-belief']} label="віра" />
-          <A name="ghost-cell" v={v['ghost-cell']} label={'примара ' + (view.unit || '')} />
-          <A name="ghost-age" v={v['ghost-age']} label="вік" />
-          <TA name="diff-count" view={view} cur={cur} pair={pair} label="розбіжність" />
-          <A name="dark-count" v={v['dark-count']} label="мовчать" />
+          <A name="mode" label="шар" reg={reg} />
+          <A name="cell" label="сота" reg={reg} />
+          <A name="cell-owner-truth" label="правда" reg={reg} />
+          <A name="cell-owner-belief" label="віра" reg={reg} />
+          <A name="ghost-cell" label={'примара ' + (view.unit || '')} reg={reg} />
+          <A name="ghost-age" label="вік" reg={reg} />
+          <A name="diff-count" label="розбіжність" reg={reg} />
+          <A name="dark-count" label="мовчать" reg={reg} />
         </Dev>
-        <Dev at="round" className={'screen' + (big ? ' big' : '')}>
-          <div className="scope" onClick={() => !big && setBig(true)}>
-            <LiveMap view={view} needles={m?.needles ?? []} belief={belief} mode={view.mode} cell={view.cell} ghost={v['ghost-cell'] ?? ''} big={big} onPick={(c) => set({ cell: c })} />
+        <Dev at="round" className="screen">
+          <div className="scope" onClick={() => zoom <= 1 && zoomIn()}>
+            <MapScreen canvas={desk.part('map', true)} zoom={Math.max(1, zoom)} onPick={(c) => set({ cell: c })} />
+            <div className="sweep" />
+            <Legend roster={roster} />
           </div>
-          {big ? <button className="close" onClick={() => setBig(false)}>×</button> : null}
+          {zoom > 1 ? <button className="back" onClick={() => setCam(null)}>Esc</button> : null}
         </Dev>
         <Dev at="right" className="mon">
           <span className="title">КАНАЛ</span>
           <svg className="spark" viewBox="0 0 1200 40" preserveAspectRatio="none">
             <polyline fill="none" stroke="currentColor" strokeWidth="6" points={spark} />
-            <line x1={view.tick} x2={view.tick} y1="0" y2="40" stroke="#ffffff" strokeWidth="4" />
+            <line ref={desk.part('sparkAt')} x1={0} x2={0} y1="0" y2="40" stroke="#ffffff" strokeWidth="4" />
           </svg>
-          <A name="deny-word" v={v['deny-word']} label={'відмова #' + view.order} />
-          <A name="deny-top-tick" v={v['deny-top-tick']} label="найгірший такт" />
+          <A name="deny-word" label={'відмова #' + view.order} reg={reg} />
+          <A name="deny-top-tick" label="найгірший такт" reg={reg} />
         </Dev>
-        <Dev at="reels" className="reels">
-          <span className="reel l" />
-          <span className="reel r" />
-          <div className="deck">
-            <button onClick={() => setPlaying(!playing)}>{playing ? '❚❚' : '▶'}</button>
-            <button onClick={() => goTick(String(view.tick + 1))}>+1</button>
-            <input type="range" min={0} max={m?.ticks ?? 1200} value={view.tick} onChange={(e) => goTick(e.target.value)} />
-          </div>
-        </Dev>
-        <Dev at="nixie"><A name="tick" v={v['tick']} /></Dev>
-        <Dev at="lamps">
-          <span className={'lamp ' + status} />
-          <span className={'lamp ' + (view.live ? 'red' : 'off')} />
-          <A name="live-lag" v={v['live-lag']} label="відстав." />
-        </Dev>
+        <Reels />
+        <Deck playing={playing} ticks={m?.ticks ?? 1200} toggle={toggle} act={act} part={desk.part} />
+        <Tubes name="needles" g={TUBES.needles} reg={reg} />
+        <Tubes name="shares" g={TUBES.shares} reg={reg} />
+        <Spot b={ENGRAVE.needles} className="engr">ГОЛКИ</Spot>
+        <Spot b={ENGRAVE.shares} className="engr">ЧАСТКИ</Spot>
+        {LAMPS.map((b, i) => (
+          <Spot key={i} b={b} className={'lamp l' + i} at={desk.part('lamp' + i)} />
+        ))}
         <Dev at="keypad" className="keys">
-          <Field name="go-tick" value={String(view.tick)} placeholder="такт" commit={goTick} />
+          <input data-zaria="go-tick" ref={desk.part('goTick')} defaultValue="0" placeholder="такт" onChange={(e) => goTick(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && goTick(e.currentTarget.value)} />
           <Field name="go-cell" value={view.cell} placeholder="сота q,r" commit={goCell} />
           <Field name="go-unit" value={view.unit} placeholder="машина" commit={(s) => set({ unit: s.trim() })} />
           <Field name="go-order" value={String(view.order)} placeholder="команда" commit={goOrder} />
         </Dev>
-        <Dev at="knob1"><select data-zaria="go-match" value={view.match} onChange={(e) => goMatch(e.target.value)}>{[1, 2, 3].map((n) => <option key={n} value={n}>{'партія ' + n}</option>)}</select></Dev>
-        <Dev at="knob2"><select data-zaria="go-mode" value={view.mode} onChange={(e) => set({ mode: e.target.value as Mode })}>{MODES.map((x) => <option key={x} value={x}>{x}</option>)}</select></Dev>
-        <Dev at="knob3"><select data-zaria="go-focus" value={nick} onChange={(e) => set({ focus: e.target.value })}>{(roster.length ? roster : [nick]).map((n) => <option key={n} value={n}>{n}</option>)}</select></Dev>
+        <Knobs match={view.match} mode={view.mode} nick={nick} roster={roster} live={!!view.live} act={act} />
         <Dev at="cassettes">
-          <A name="ab-winner" v={v['ab-winner']} label="краще" />
-          <A name="ab-diff" v={v['ab-diff']} label="різниця" />
-          <A name="ab-top" v={v['ab-top']} label="стаття" />
+          <A name="ab-winner" label="краще" reg={reg} />
+          <A name="ab-diff" label="різниця" reg={reg} />
+          <A name="ab-top" label="стаття" reg={reg} />
         </Dev>
-        <Dev at="drawer" className="drawer">
-          {packs.map((p) => (
-            <button key={p.id} className={p.id === view.pack ? 'on' : ''} data-zaria="go-pack" data-zaria-value={p.id} onClick={() => set({ pack: p.id })}>
-              {p.id}
-            </button>
-          ))}
-        </Dev>
-        <Dev at="lever" className={'lever s' + view.promote}>
-          <select data-zaria="go-preset" value={preset} onChange={(e) => setPreset(e.target.value)}>
-            {PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <button data-zaria="do-promote" onClick={promote}>в бій</button>
-          <A name="promote-status" v={v['promote-status']} label="відповідь" />
-        </Dev>
+        <Drawer packs={packs} pack={view.pack} act={act} />
+        <Lever preset={preset} status={view.promote} act={act} reg={reg} />
       </div>
     </div>
   );
