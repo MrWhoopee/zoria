@@ -36,8 +36,8 @@ for (const group of oursDirs) {
     const pack = rec.pack;
     if (!pack.belief) pack.belief = { seat: 0, nick: pack.roster?.[0] ?? '', files: [1, 2, 3].map((n) => 'belief-' + n + '.ndjson') };
     const seed = d.split('-')[1] ?? d;
-    const rivals = (pack.roster ?? []).slice(1).join('+');
-    const preset = group === 'ours' ? 'глушій-2' : group === 'ours3' ? 'глушій-3' : group.replace(/^ours-?/, '');
+    const rivals = (pack.roster ?? []).filter((_, i) => i !== pack.belief.seat).join('+');
+    const preset = group === 'ours' ? 'глушій-2' : group === 'ours3' ? 'глушій-3' : group === 'ours-група' ? 'глушій-5' :group.replace(/^ours-?/, '');
     all.push({ id: 'ours-' + (all.length - 2), title: preset + ' vs ' + rivals + ' · ' + seed, preset, dir, rec });
   }
 }

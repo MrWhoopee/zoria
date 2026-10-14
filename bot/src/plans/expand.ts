@@ -51,6 +51,7 @@ export function release(ctx: Ctx): void {
       if (!unit || w.t >= v.dawnAt) memo.res.delete(id);
       continue;
     }
+    if (!unit && ctx.preset.deathBan > 0 && (r.kind === 'take' || r.kind === 'build')) memo.banned.set(keyOf(r.cell), w.t + ctx.preset.deathBan);
     const o = w.owner.get(keyOf(r.cell));
     const done = r.kind !== 'feed' && o === v.slot;
     const was = r.owner ?? null;

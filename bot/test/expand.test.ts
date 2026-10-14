@@ -77,6 +77,22 @@ test('release drops reservations of dead units and of targets taken by others', 
   assert.equal(ctx.memo.res.size, 0);
 });
 
+test('with deathBan, the target of a dead Tkach is banned for that long', () => {
+  const obs = makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } });
+  const [r0, r1] = ctxOf('B', obs).v.ruins;
+  assert.ok(r0 && r1);
+  const off = ctxOf('B', obs);
+  off.memo.res.set('T-B99', { kind: 'take', cell: r1, since: 50, sent: 50 });
+  release(off);
+  assert.equal(off.memo.banned.has(keyOf(r1)), false);
+  const on = ctxOf('B', obs, 2026, { ...presetOf('глушій-6') });
+  on.memo.res.set('T-B6', { kind: 'take', cell: r0, since: 50, sent: 50 });
+  on.memo.res.set('T-B99', { kind: 'take', cell: r1, since: 50, sent: 50 });
+  release(on);
+  assert.equal(on.memo.banned.get(keyOf(r1)), 360);
+  assert.equal(on.memo.banned.has(keyOf(r0)), false);
+});
+
 test('release drops a reservation once the needle is ours', () => {
   const ctx = ctxOf('B', makeObs({ t: 60, mine: { ...makeObs().mine, needles: starts, units: [tkach('T-B6', 6, 6)] } }));
   ctx.memo.res.set('T-B6', { kind: 'take', cell: { q: 7, r: 5 }, since: 50, sent: 50 });
