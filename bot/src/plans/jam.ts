@@ -96,6 +96,19 @@ function standOf(ctx: Ctx, target: Cell, field: Map<string, number>, taken: Set<
   return best;
 }
 
+export function denyOf(ctx: Ctx, cell: Cell, owner: ActorName, eta: number): number {
+  const { w, preset } = ctx;
+  const order = w.order;
+  if (preset.orderJam <= 0 || !order) return 0;
+  const k = keyOf(cell);
+  if (!order.cells.some((c) => keyOf(c) === k)) return 0;
+  const owners = order.cells.map((c) => w.owner.get(keyOf(c)) ?? null);
+  const held = owners.filter((o) => o === owner).length;
+  if (held < 2 || owners.some((o) => o !== owner && o !== null)) return 0;
+  if (w.t + eta > order.to) return 0;
+  return (preset.orderJam * order.bonus * held) / order.cells.length;
+}
+
 function targets(ctx: Ctx, reserved: Set<string>): Target[] {
   const { v, w, memo } = ctx;
   const starts = new Set(v.starts.map((s) => keyOf(s.cell)));
@@ -109,7 +122,7 @@ function targets(ctx: Ctx, reserved: Set<string>): Target[] {
     const cell = parse(k);
     const weight = o === lead ? ctx.preset.jamLeader : 1;
     const perTick = jamGain(ctx, cell, tailOf(ctx, o, cell), own, foe, weight);
-    if (perTick > 0) out.push({ cell, owner: o, perTick });
+    if (perTick > 0 || denyOf(ctx, cell, o, 0) > 0) out.push({ cell, owner: o, perTick });
   }
   return out;
 }
@@ -219,7 +232,8 @@ export function jam(ctx: Ctx): Task[] {
       if (!s) continue;
       const span = Math.min(JAM_SPAN, left - s.eta);
       if (span <= 0) continue;
-      const score = (t.perTick * rate * span) / Math.pow(s.eta + 1, preset.etaPower);
+      const score = (Math.max(0, t.perTick) * rate * span + denyOf(ctx, t.cell, t.owner, s.eta)) / Math.pow(s.eta + 1, preset.etaPower);
+      if (score <= 0) continue;
       if (!best || score > best.score) best = { t, stand: s.cell, score };
     }
     if (!best) continue;

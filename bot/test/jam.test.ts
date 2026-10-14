@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { MineUnit, Observe } from '@zoria/protocol';
 import { keyOf } from '../src/hex.ts';
-import { jam, jamGain, tailOf, JAM_BAN, LOOT_GRACE } from '../src/plans/jam.ts';
+import { denyOf, jam, jamGain, tailOf, JAM_BAN, LOOT_GRACE } from '../src/plans/jam.ts';
 import { pullOf } from '../src/map/coverage.ts';
 import { presetOf } from '../src/preset.ts';
 import { ctxOf } from './ctx.ts';
@@ -122,4 +122,15 @@ test('when jamming is off, a Klinok busy ramming only loses its jam reservation'
   ctx.memo.res.set('K-B7', { kind: 'jam', cell: { q: 5, r: -8 }, since: 290, sent: 290, owner: 'A' });
   assert.deepEqual(jam(ctx), []);
   assert.equal(ctx.memo.res.has('K-B7'), false);
+});
+
+test('with orderJam, a contract a foe is about to hold is worth jamming, and nothing else is', () => {
+  const order = { cells: [{ q: 5, r: -8 }, { q: 5, r: -4 }, { q: 3, r: -6 }], from: 280, to: 370, bonus: 30, holdTicks: 12 };
+  const pub = { ...makeObs().pub, order };
+  const ctx = ctxOf('B', obsWith([], { pub }), 2026, presetOf('основний+jam=1+jamHome=0+orderJam=1'));
+  assert.equal(denyOf(ctx, { q: 5, r: -8 }, 'A', 10), 20);
+  assert.equal(denyOf(ctx, { q: 5, r: -12 }, 'A', 10), 0);
+  assert.equal(denyOf(ctx, { q: 5, r: -8 }, 'A', 80), 0);
+  const off = ctxOf('B', obsWith([], { pub }), 2026, on);
+  assert.equal(denyOf(off, { q: 5, r: -8 }, 'A', 10), 0);
 });

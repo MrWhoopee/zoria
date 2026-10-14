@@ -27,13 +27,14 @@ export interface Memo {
   pendingYard: { cls: ClsName; eta: number }[];
   lastAccepted: number;
   banned: Map<string, number>;
+  scans: Map<string, number>;
   bids: Map<number, number>;
   loot: Map<string, { unit: string; sent: number }>;
   general: General;
 }
 
 export function newMemo(): Memo {
-  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Map(), bids: new Map(), loot: new Map(), general: newGeneral() };
+  return { res: new Map(), pendingYard: [], lastAccepted: 0, banned: new Map(), scans: new Map(), bids: new Map(), loot: new Map(), general: newGeneral() };
 }
 
 export interface Ctx {

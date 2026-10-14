@@ -29,7 +29,7 @@ services:
       ZARIA_TOKEN: ${ZARIA_TOKEN:-}
       ZARIA_ENGINE: ${ZARIA_ENGINE:-}
       ZARIA_FREEZE: ${ZARIA_FREEZE:-}
-      ZARIA_PRESET: ${ZARIA_PRESET:-глушій-5}
+      ZARIA_PRESET: ${ZARIA_PRESET:-глушій-7}
       ZARIA_BELIEF: /data/belief.ndjson
       STATUS_PORT: '7811'
       STATUS_HOST: 0.0.0.0
