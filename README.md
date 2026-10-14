@@ -115,14 +115,14 @@ in place of the real one.
 
 ## The bot
 
-The bot lives in `bot/` (its `package.json` declares `zaria.bot`). The live default preset is `глушій-6`; `ZARIA_PRESET` picks another named preset.
+The bot lives in `bot/` (its `package.json` declares `zaria.bot`). The live default preset is `глушій-5`; `ZARIA_PRESET` picks another named preset.
 
 ```bash
 cd bot
 npm ci
 npm test                # unit tests, no network, well under 10 minutes
 npm run build           # TypeScript to dist/
-npm run league -- --players "глушій-6" --pool "рівний,обхідник" --seeds 4 --workers 6
+npm run league -- --players "глушій-5" --pool "рівний,обхідник" --seeds 4 --workers 6
 ```
 
 ## Submission stack

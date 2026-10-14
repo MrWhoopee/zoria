@@ -25,7 +25,7 @@ export function TopBar({ arena }: { arena: Arena }) {
   const [slot, setSlot] = useState<SlotName>('A');
   const [rivalA, setRivalA] = useState('глушій');
   const [rivalB, setRivalB] = useState('загарбник');
-  const [preset, setPreset] = useState('глушій-6');
+  const [preset, setPreset] = useState('глушій-5');
   const names = arena.names.length > 0 ? arena.names : ['глушій'];
   const started = arena.map !== null;
   const done = arena.frame?.done ?? false;

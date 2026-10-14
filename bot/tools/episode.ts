@@ -22,7 +22,7 @@ const { values, positionals } = parseArgs({
     slot: { type: 'string', default: 'A' },
     from: { type: 'string', default: '1' },
     to: { type: 'string', default: '1200' },
-    preset: { type: 'string', default: 'глушій-6' },
+    preset: { type: 'string', default: 'глушій-5' },
   },
 });
 
