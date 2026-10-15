@@ -14,10 +14,11 @@ test('scout is off by default', () => {
   assert.equal(scout(ctxOf('B', obs)).length, 0);
 });
 
-test('the scan lattice covers every valley cell', () => {
+test('the scan lattice covers every valley cell, and every center is inside the valley', () => {
   const ctx = ctxOf('B', makeObs());
   const covered = new Set(centers(ctx.v).flatMap((c) => disc(c, 3).map(keyOf)));
   assert.ok(ctx.v.cells.filter((c) => inside(ctx.v, c)).every((c) => covered.has(keyOf(c))));
+  assert.ok(centers(ctx.v).every((c) => inside(ctx.v, c)));
 });
 
 test('with spare ears scout scans an unseen area near the network, paid from the ears only', () => {

@@ -13,11 +13,11 @@ export const SCOUT_VALUE = 1.5;
 
 const none = (): void => undefined;
 
-let lattice: { key: string; cells: Cell[] } = { key: '', cells: [] };
+const lattice = new WeakMap<Valley, Cell[]>();
 
 export function centers(v: Valley): Cell[] {
-  const id = String(v.radius);
-  if (lattice.key === id) return lattice.cells;
+  const known = lattice.get(v);
+  if (known) return known;
   const rad = cfg(v, 'scanRad');
   const a = { q: 2 * rad + 1, r: -rad };
   const b = { q: rad, r: rad + 1 };
@@ -25,10 +25,17 @@ export function centers(v: Valley): Cell[] {
   for (let i = -8; i <= 8; i++) {
     for (let j = -8; j <= 8; j++) {
       const c = { q: i * a.q + j * b.q, r: i * a.r + j * b.r };
-      if (disc(c, rad).some((x) => inside(v, x))) out.push(c);
+      if (inside(v, c)) {
+        out.push(c);
+        continue;
+      }
+      const near = disc(c, rad)
+        .filter((x) => inside(v, x))
+        .sort((x, y) => dist(x, c) - dist(y, c) || keyOf(x).localeCompare(keyOf(y)))[0];
+      if (near) out.push(near);
     }
   }
-  lattice = { key: id, cells: out };
+  lattice.set(v, out);
   return out;
 }
 
